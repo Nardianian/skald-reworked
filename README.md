@@ -15,7 +15,7 @@ MIDI channel and velocity setting mode:
 
 --> Drag Only: Changes the point's position on the disk.
 
-# Skald (original readme)                                          # Skald (original readme)
+## Skald                                                # Skald (original readme)
 
 <div align="center">
 
@@ -278,6 +278,7 @@ See [LICENSE](LICENSE) for full details.
 🎵 **Make something unique!** 🎵
 
 </div>
+
 
 
 
