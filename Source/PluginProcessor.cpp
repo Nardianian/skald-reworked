@@ -1,16 +1,38 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include <juce_audio_devices/juce_audio_devices.h>
 
 //==============================================================================
 SkaldProcessor::SkaldProcessor()
-     : AudioProcessor (BusesProperties()
-                       .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
-                      )
+    : AudioProcessor(BusesProperties()
+        .withOutput("Output", juce::AudioChannelSet::stereo(), true)
+    )
 {
     // Initialize scale
     updateScaleNotes();
 
+    // --- Standalone MIDI Setup ---
+    if (juce::JUCEApplication::isStandaloneApp())
+    {
+        availableMidiOutputs = juce::MidiOutput::getAvailableDevices();
+
+        if (!availableMidiOutputs.isEmpty())
+        {
+            if (standaloneMidiOut.output != nullptr)
+                standaloneMidiOut.output.reset();
+
+            standaloneMidiOut.output = juce::MidiOutput::openDevice(availableMidiOutputs[0].identifier);
+
+            if (standaloneMidiOut.output != nullptr)
+            {
+                standaloneMidiOut.output->startBackgroundThread();
+                standaloneMidiOut.selectedPortIndex = 0;
+            }
+        }
+    }
+
     // Start with a simple pentatonic melody pattern
+    dots.clear();
     addDot(0.0f, 0, juce::Colour(0xffff6b35));      // Root
     addDot(90.0f, 2, juce::Colour(0xffff6b35));     // 3rd note
     addDot(180.0f, 4, juce::Colour(0xffff6b35));    // 5th note
@@ -19,6 +41,11 @@ SkaldProcessor::SkaldProcessor()
 
 SkaldProcessor::~SkaldProcessor()
 {
+    if (standaloneMidiOut.output != nullptr)
+    {
+        standaloneMidiOut.output->stopBackgroundThread();
+        standaloneMidiOut.output.reset();
+    }
 }
 
 //==============================================================================
@@ -105,6 +132,9 @@ void SkaldProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             // Note-off occurs in this buffer
             juce::MidiMessage noteOff = juce::MidiMessage::noteOff(note.channel, note.midiNote, (juce::uint8) 0);
             midiMessages.addEvent(noteOff, static_cast<int>(noteOffInBuffer));
+
+            if (standaloneMidiOut.output != nullptr)
+                standaloneMidiOut.output->sendMessageNow(noteOff);
         }
         else if (noteOffInBuffer >= buffer.getNumSamples())
         {
@@ -120,12 +150,16 @@ void SkaldProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         juce::ScopedLock lock(previewNotesLock);
         for (const auto& previewNote : previewNotesToSend)
         {
-            juce::MidiMessage noteOn = juce::MidiMessage::noteOn(1, previewNote.midiNote, (juce::uint8) 100);
+            int pVel = juce::jlimit(1, 127, previewNote.timeStamp);
+            juce::MidiMessage noteOn = juce::MidiMessage::noteOn(1, previewNote.midiNote, (juce::uint8)pVel);
             midiMessages.addEvent(noteOn, 0);
+
+            if (standaloneMidiOut.output != nullptr)
+                standaloneMidiOut.output->sendMessageNow(noteOn);
 
             // Schedule note-off for preview (100ms)
             juce::int64 noteOffSample = totalSamplesProcessed + static_cast<juce::int64>(sampleRate * 0.1);
-            activeNotes.push_back({previewNote.midiNote, 1, noteOffSample});
+            activeNotes.push_back({ previewNote.midiNote, 1, noteOffSample });
         }
         previewNotesToSend.clear();
     }
@@ -384,28 +418,31 @@ void SkaldProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                 // Get MIDI note from ring index based on current scale
                 int midiNote = ringToMidiNote(dots[i].ringIndex);
 
-                // Calculate velocity with variation
-                int finalVelocity = globalVelocity;
+                // Calculate velocity with individual dot base
+                int finalVelocity = dots[i].velocity;
                 if (velocityVariation > 0.0f)
                 {
                     // Add random variation based on velocityVariation parameter
                     float variation = (random.nextFloat() * 2.0f - 1.0f) * (velocityVariation / 100.0f);
-                    finalVelocity = static_cast<int>(globalVelocity * (1.0f + variation * 0.5f));
+                    finalVelocity = static_cast<int>(dots[i].velocity * (1.0f + variation * 0.5f));
                     finalVelocity = juce::jlimit(1, 127, finalVelocity);
                 }
 
-                // All notes go to MIDI channel 1
+                // Trigger note on its specific MIDI channel
                 juce::MidiMessage noteOn = juce::MidiMessage::noteOn(
-                    1,  // Channel 1
+                    dots[i].midiChannel,
                     midiNote,
-                    (juce::uint8) finalVelocity  // Use calculated velocity
+                    (juce::uint8)finalVelocity
                 );
                 midiMessages.addEvent(noteOn, triggerSample);
+
+                if (standaloneMidiOut.output != nullptr)
+                    standaloneMidiOut.output->sendMessageNow(noteOn);
 
                 // Schedule note-off based on gate time (will be sent in future buffer)
                 juce::int64 absoluteNoteOffSample = totalSamplesProcessed + triggerSample +
                     static_cast<juce::int64>(sampleRate * (gateTimeMs / 1000.0));
-                activeNotes.push_back({midiNote, 1, absoluteNoteOffSample});
+                activeNotes.push_back({ midiNote, dots[i].midiChannel, absoluteNoteOffSample });
 
                 triggeredThisRotation[i] = true;
 
@@ -453,7 +490,6 @@ juce::AudioProcessorEditor* SkaldProcessor::createEditor()
 //==============================================================================
 void SkaldProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // Save plugin state (dots configuration, speed, scale, etc.)
     juce::MemoryOutputStream stream(destData, false);
 
     stream.writeFloat(speed);
@@ -467,9 +503,10 @@ void SkaldProcessor::getStateInformation (juce::MemoryBlock& destData)
         stream.writeInt(dot.ringIndex);
         stream.writeInt(dot.color.getARGB());
         stream.writeBool(dot.active);
+        stream.writeInt(dot.velocity);     // Patch 17
+        stream.writeInt(dot.midiChannel);  // Patch 17
     }
 
-    // Save new parameters
     stream.writeInt(globalVelocity);
     stream.writeFloat(gateTimeMs);
     stream.writeBool(isReversed);
@@ -480,7 +517,6 @@ void SkaldProcessor::getStateInformation (juce::MemoryBlock& destData)
 
 void SkaldProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    // Restore plugin state
     juce::MemoryInputStream stream(data, static_cast<size_t>(sizeInBytes), false);
 
     speed = stream.readFloat();
@@ -498,21 +534,20 @@ void SkaldProcessor::setStateInformation (const void* data, int sizeInBytes)
         dot.ringIndex = stream.readInt();
         dot.color = juce::Colour(stream.readInt());
         dot.active = stream.readBool();
+        dot.velocity = stream.readInt();    // Patch 17
+        dot.midiChannel = stream.readInt(); // Patch 17
         dots.push_back(dot);
     }
 
     triggeredThisRotation.resize(dots.size(), false);
 
-    // Load new parameters (with defaults for older saved states)
-    if (!stream.isExhausted())
-    {
-        globalVelocity = stream.readInt();
-        gateTimeMs = stream.readFloat();
-        isReversed = stream.readBool();
-        probability = stream.readFloat();
-        velocityVariation = stream.readFloat();
-        swing = stream.readFloat();
-    }
+    // Safe Read
+    if (!stream.isExhausted()) globalVelocity = stream.readInt();
+    if (!stream.isExhausted()) gateTimeMs = stream.readFloat();
+    if (!stream.isExhausted()) isReversed = stream.readBool();
+    if (!stream.isExhausted()) probability = stream.readFloat();
+    if (!stream.isExhausted()) velocityVariation = stream.readFloat();
+    if (!stream.isExhausted()) swing = stream.readFloat();
 }
 
 //==============================================================================
@@ -613,11 +648,19 @@ int SkaldProcessor::ringToMidiNote(int ringIndex) const
 void SkaldProcessor::triggerPreviewNote(int ringIndex)
 {
     int midiNote = ringToMidiNote(ringIndex);
+    int previewVel = globalVelocity;
+
+    if (auto* editor = dynamic_cast<SkaldEditor*>(getActiveEditor()))
+    {
+        int selectedIdx = editor->getSelectedDotIndex();
+        if (selectedIdx >= 0 && selectedIdx < static_cast<int>(dots.size()))
+            previewVel = dots[selectedIdx].velocity;
+    }
 
     juce::ScopedLock lock(previewNotesLock);
     PreviewNote preview;
     preview.midiNote = midiNote;
-    preview.timeStamp = 0;
+    preview.timeStamp = previewVel; // Trasportiamo la velocity qui
     previewNotesToSend.push_back(preview);
 }
 
@@ -637,3 +680,4 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new SkaldProcessor();
 }
+
