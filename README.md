@@ -1,8 +1,22 @@
+# Skald (this fork readme)
+The idea of ​​this fork was born from the desire to fix some aspects of the standalone GUI (buttons, boxes and labels overlapping at the top left) and therefore from the attempt to implement some development ideas suggested by the author of the original repository (see the bottom of the readme).
+New features:
+- Added velocity selection for dot.
+- Added multi-channel midi output selection for dot (with midi port selection in standalone).
+- Fixed GUI bugs on standalone.
+- ASIO & Jack support.
+Only for Windows x64.
+
+MIDI channel and velocity setting mode:
+--> SHIFT + Vertical Drag: Changes the individual point's velocity.
+--> ALT + Vertical Drag: Changes the individual point's MIDI channel.
+--> Drag Only: Changes the point's position on the disk.
+
 <div align="center">
 
 <img src="images/viking_full.png" alt="Skald Logo" width="300"/>
 
-# Skald
+# Skald (original readme)
 
 ### Viking MIDI Warrior
 
@@ -207,8 +221,9 @@ cmake --build build --config Release -j4
 
 Want to extend Skald? Ideas we're considering:
 
-- [ ] Multiple MIDI channels per dot (color-coded)
-- [ ] Per-dot velocity and gate time
+- [X] Multiple MIDI channels per dot (color-coded) ---> made in the fork 
+- [X] Per-dot velocity ---> made in the fork
+- [ ] Per-dot gate time
 - [ ] Euclidean rhythm generator
 - [ ] MIDI CC modulation per dot
 - [ ] Pattern preset browser
@@ -260,3 +275,4 @@ See [LICENSE](LICENSE) for full details.
 🎵 **Make something unique!** 🎵
 
 </div>
+
