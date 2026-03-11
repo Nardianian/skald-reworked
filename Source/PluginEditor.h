@@ -71,6 +71,7 @@ class SkaldEditor : public juce::AudioProcessorEditor,
 {
 public:
     SkaldEditor (SkaldProcessor&);
+    int getSelectedDotIndex() const { return selectedDotIndex; }
     ~SkaldEditor() override;
 
     //==============================================================================
@@ -166,6 +167,8 @@ private:
     // Interaction state
     int selectedDotIndex = -1;
     bool isDraggingDot = false;
+    int initialChannelOnDrag = 1;
+    int initialVelocityOnDrag;
     int currentMidiChannel = 1;
 
     // Scratching state
@@ -210,3 +213,4 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SkaldEditor)
 };
+
