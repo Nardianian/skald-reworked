@@ -1,5 +1,6 @@
 #pragma once
 
+#include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_graphics/juce_graphics.h>
 
@@ -28,10 +29,12 @@ struct TurntableDot
     float angle;        // Position on the turntable (0-360 degrees)
     int ringIndex;      // Which ring (0-11) - determines pitch in scale
     juce::Colour color; // Visual color representation
+    int midiChannel;    // MIDI Channel (1-16)
     bool active;        // Whether this dot is active
+    int velocity;       // Individual velocity (1-127)
 
     TurntableDot() : angle(0.0f), ringIndex(0),
-                     color(juce::Colours::red), active(true) {}
+                     color(juce::Colours::red), midiChannel(1), active(true), velocity(100) {}
 };
 
 //==============================================================================
@@ -162,6 +165,10 @@ public:
     // Get recently triggered dots for visual feedback
     std::vector<TriggeredDotInfo> getRecentlyTriggeredDots() const;
 
+    // Device Manager to force MIDI in Standalone
+    juce::AudioDeviceManager deviceManager;
+
+
 private:
     // Structure to track active MIDI notes for proper note-off timing
     struct ActiveNote
@@ -232,6 +239,16 @@ private:
 
     // Track swing state (which beat we're on for swing timing)
     int swingBeatCounter = 0;
+
+    // --- Manual MIDI management ---
+    struct CustomMidiOut
+    {
+        std::unique_ptr<juce::MidiOutput> output;
+        int selectedPortIndex = -1;
+    };
+    CustomMidiOut standaloneMidiOut;
+    juce::Array<juce::MidiDeviceInfo> availableMidiOutputs;
+    void refreshMidiOutputs();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SkaldProcessor)
 };
