@@ -8,15 +8,18 @@ New features:
 Only for Windows x64.
 
 MIDI channel and velocity setting mode:
+
 --> SHIFT + Vertical Drag: Changes the individual point's velocity.
+
 --> ALT + Vertical Drag: Changes the individual point's MIDI channel.
+
 --> Drag Only: Changes the point's position on the disk.
+
+# Skald (original readme)
 
 <div align="center">
 
 <img src="images/viking_full.png" alt="Skald Logo" width="300"/>
-
-# Skald (original readme)
 
 ### Viking MIDI Warrior
 
@@ -275,4 +278,5 @@ See [LICENSE](LICENSE) for full details.
 🎵 **Make something unique!** 🎵
 
 </div>
+
 
