@@ -84,3 +84,4 @@ target_link_libraries(Skald PRIVATE
 
 # C++ standard
 target_compile_features(Skald PRIVATE cxx_std_17)
+
