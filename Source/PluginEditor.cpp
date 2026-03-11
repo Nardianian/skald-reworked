@@ -619,6 +619,9 @@ SkaldEditor::SkaldEditor (SkaldProcessor& p)
 
     // Start timer for animation (30 FPS)
     startTimerHz(30);
+
+    setResizable(true, true);
+    setResizeLimits(600, 450, 2000, 1500); 
 }
 
 SkaldEditor::~SkaldEditor()
@@ -1025,14 +1028,16 @@ void SkaldEditor::paint (juce::Graphics& g)
             pulseAmount = 1.0f + (1.5f * velocityBrightness * juce::jmax(0.0f, 1.0f - (timeSinceTrigger * 5.0f)));
         }
 
-        float dotSize = (selectedDotIndex == static_cast<int>(i)) ? 6.0f : 4.5f;
+        float velocityFactor = dots[i].velocity / 127.0f;
+        float dotSize = ((selectedDotIndex == static_cast<int>(i)) ? 6.0f : 4.5f) * (0.7f + velocityFactor * 0.6f);
         if (isPulsing) dotSize *= 1.2f;
 
         // LIGHT FROM UNDERNEATH EFFECT - Smooth glowing with more rings for softer edges
         for (int glowRing = 6; glowRing >= 0; --glowRing)
         {
             float glowSize = dotSize * (1.5f + glowRing * 0.4f) * pulseAmount;
-            float alpha = (isPulsing ? 0.25f : 0.08f) * (1.0f - (glowRing / 7.0f));  // Smooth gradient
+            float velAlpha = 0.4f + (dots[i].velocity / 127.0f) * 0.6f;
+            float alpha = (isPulsing ? 0.25f : 0.08f) * (1.0f - (glowRing / 7.0f)) * velAlpha;  // Smooth gradient + vel
             g.setColour(dots[i].color.withAlpha(alpha));
             g.fillEllipse(dotPos.x - glowSize, dotPos.y - glowSize, glowSize * 2, glowSize * 2);
         }
@@ -1059,9 +1064,41 @@ void SkaldEditor::paint (juce::Graphics& g)
             g.fillEllipse(dotPos.x - 1, dotPos.y - 1, 2, 2);
         }
 
+        g.setColour(juce::Colours::black.withAlpha(0.8f));
+        g.setFont(10.0f);
+        g.drawText(juce::String(dots[i].midiChannel),
+            static_cast<int>(dotPos.x - 10),
+            static_cast<int>(dotPos.y - 10),
+            20, 20,
+            juce::Justification::centred);
+
         // Note label when selected
         if (selectedDotIndex == static_cast<int>(i))
         {
+            // --- HUD (Velocity / MIDI Channel) ---
+            if (isDraggingDot && juce::ModifierKeys::getCurrentModifiers().isAnyModifierKeyDown())
+            {
+                juce::String statusText;
+                if (juce::ModifierKeys::getCurrentModifiers().isShiftDown())
+                    statusText = "VELOCITY: " + juce::String(dots[i].velocity);
+                else if (juce::ModifierKeys::getCurrentModifiers().isAltDown())
+                    statusText = "MIDI CH: " + juce::String(dots[i].midiChannel);
+
+                if (statusText.isNotEmpty())
+                {
+                    auto hudArea = juce::Rectangle<int>(getWidth() - 160, 115, 145, 28);
+
+                    g.setColour(juce::Colours::black.withAlpha(0.7f));
+                    g.fillRoundedRectangle(hudArea.toFloat(), 4.0f);
+                    g.setColour(juce::Colour(0xff00d9ff).withAlpha(0.8f));
+                    g.drawRoundedRectangle(hudArea.toFloat(), 4.0f, 1.5f);
+
+                    g.setColour(juce::Colours::white);
+                    g.setFont(juce::FontOptions(14.0f, juce::Font::bold));
+                    g.drawText(statusText, hudArea, juce::Justification::centred);
+                }
+            }
+
             g.setColour(juce::Colour(0xff00d9ff));
             g.setFont(juce::FontOptions("Arial", 10.0f, juce::Font::bold));
             int midiNote = audioProcessor.ringToMidiNote(ringIndex);
@@ -1318,6 +1355,9 @@ void SkaldEditor::setControlsVisible(bool visible)
 void SkaldEditor::resized()
 {
     auto area = getLocalBounds();
+    
+    if (juce::JUCEApplication::isStandaloneApp())
+        area.removeFromTop(45);
 
     // Top controls - single row with LED displays, tap buttons, and knobs
     auto topControls = area.removeFromTop(100);  // Increased height for knobs
@@ -1333,7 +1373,8 @@ void SkaldEditor::resized()
         bpmLabel.setVisible(true);
         bpmSlider.setVisible(true);
 
-        playStopButton.setBounds(topControls.removeFromLeft(60));
+        auto playArea = topControls.removeFromLeft(60);
+        playStopButton.setBounds(playArea.getX(), playArea.getY() + 10, playArea.getWidth(), 30);
         topControls.removeFromLeft(8);
 
         bpmLabel.setBounds(topControls.removeFromLeft(45));
@@ -1343,7 +1384,7 @@ void SkaldEditor::resized()
     }
     else
     {
-        // Hide in VST/AU mode
+        // Hide in VST mode
         playStopButton.setVisible(false);
         bpmLabel.setVisible(false);
         bpmSlider.setVisible(false);
@@ -1560,6 +1601,14 @@ void SkaldEditor::mouseDown (const juce::MouseEvent& event)
     // Check if we clicked on an existing dot
     selectedDotIndex = findDotAtPoint(clickPos);
 
+    if (selectedDotIndex >= 0)
+    {
+        auto& dots = audioProcessor.getDots();
+        if (selectedDotIndex < static_cast<int>(dots.size()))
+            initialChannelOnDrag = dots[selectedDotIndex].midiChannel;
+        initialVelocityOnDrag = dots[selectedDotIndex].velocity;
+    }
+
     // Double-click handling
     if (event.getNumberOfClicks() == 2)
     {
@@ -1731,46 +1780,71 @@ void SkaldEditor::mouseDrag (const juce::MouseEvent& event)
         return;
     }
 
-    if (isDraggingDot && selectedDotIndex >= 0)
     {
         auto& dots = audioProcessor.getDots();
-        if (selectedDotIndex < static_cast<int>(dots.size()))
+
+        if (selectedDotIndex >= (int)dots.size()) return;
+
+        // 1. SHIFT = Modify VELOCITY
+        if (event.mods.isShiftDown())
         {
-            // Calculate which ring we're over
-            float innerRadius = turntableRadius * 0.90f;
-            auto delta = event.position - turntableCenter;
-            float distanceFromCenter = delta.getDistanceFromOrigin();
+            int dragDelta = -event.getDistanceFromDragStartY() / 2;
+            int newVelocity = juce::jlimit(1, 127, initialVelocityOnDrag + dragDelta);
 
-            // Update angle
-            float angle = angleFromPoint(event.position);
-            dots[selectedDotIndex].angle = angle;
-
-            // Check if we moved to a different ring
-            int numRings = audioProcessor.getNumRings();
-            float ringSpacing = numRings > 0 ? 0.80f / numRings : 0.15f;
-
-            int newRingIndex = dots[selectedDotIndex].ringIndex;
-            for (int ring = 0; ring < numRings; ++ring)
+            if (newVelocity != dots[selectedDotIndex].velocity)
             {
-                float ringOuterRadius = innerRadius * (0.95f - ring * ringSpacing);
-                float ringInnerRadius = innerRadius * (0.95f - (ring + 1) * ringSpacing);
-
-                if (distanceFromCenter <= ringOuterRadius && distanceFromCenter >= ringInnerRadius)
-                {
-                    newRingIndex = ring;
-                    break;
-                }
+                dots[selectedDotIndex].velocity = newVelocity;
+                repaint();
             }
-
-            // Update ring and trigger preview if ring changed
-            if (newRingIndex != dots[selectedDotIndex].ringIndex)
-            {
-                dots[selectedDotIndex].ringIndex = newRingIndex;
-                audioProcessor.triggerPreviewNote(newRingIndex);
-            }
-
-            repaint();
+            return;
         }
+
+        // 2. ALT = Modify MIDI CHANNEL (with colour offset)
+        if (event.mods.isAltDown())
+        {
+            int dragDelta = -event.getDistanceFromDragStartY() / 15;
+            int newChannel = juce::jlimit(1, 16, initialChannelOnDrag + dragDelta);
+
+            if (newChannel != dots[selectedDotIndex].midiChannel)
+            {
+                dots[selectedDotIndex].midiChannel = newChannel;
+                // Use index (newChannel - 1) to map the 16 colours
+                dots[selectedDotIndex].color = channelColors[(newChannel - 1) % channelColors.size()];
+                repaint();
+            }
+            return;
+        }
+
+        // 3. NORMAL DRAG (Corner and Ring)
+        auto delta = event.position - turntableCenter;
+        float distanceFromCenter = delta.getDistanceFromOrigin();
+        float innerRadius = turntableRadius * 0.90f;
+
+        dots[selectedDotIndex].angle = angleFromPoint(event.position);
+
+        int numRings = audioProcessor.getNumRings();
+        float ringSpacing = numRings > 0 ? 0.80f / numRings : 0.15f;
+        int newRingIndex = dots[selectedDotIndex].ringIndex;
+
+        for (int ring = 0; ring < numRings; ++ring)
+        {
+            float ringOuterRadius = innerRadius * (0.95f - ring * ringSpacing);
+            float ringInnerRadius = innerRadius * (0.95f - (ring + 1) * ringSpacing);
+
+            if (distanceFromCenter <= ringOuterRadius && distanceFromCenter >= ringInnerRadius)
+            {
+                newRingIndex = ring;
+                break;
+            }
+        }
+
+        if (newRingIndex != dots[selectedDotIndex].ringIndex)
+        {
+            dots[selectedDotIndex].ringIndex = newRingIndex;
+            audioProcessor.triggerPreviewNote(newRingIndex);
+        }
+
+        repaint();
     }
 }
 
