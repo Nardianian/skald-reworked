@@ -123,7 +123,7 @@ void HardwareButtonLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButt
 SkaldEditor::SkaldEditor (SkaldProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p), hardwareLookAndFeel(this)
 {
-    setSize (900, 850);  // Wider and taller for more room
+    setSize (1350, 850);  // Wider and taller for more room
 
     // Speed display (LED screen style - cyan to match turntable)
     speedDisplay.setText("1x", juce::dontSendNotification);
@@ -617,6 +617,82 @@ SkaldEditor::SkaldEditor (SkaldProcessor& p)
         wallpaperImage = scaledWallpaper;
     }
 
+    versionLabel.setText("v1.1.0", juce::dontSendNotification);
+    versionLabel.setFont(juce::FontOptions(14.0f, juce::Font::bold)); 
+    versionLabel.setColour(juce::Label::textColourId, juce::Colours::cyan.withAlpha(0.6f)); 
+    versionLabel.setJustificationType(juce::Justification::centredRight); 
+    addAndMakeVisible(versionLabel); 
+
+    algoTitleLabel.setText("ALGORITHMIC GEN", juce::dontSendNotification);
+    algoTitleLabel.setJustificationType(juce::Justification::centred);
+    algoTitleLabel.setFont(csArthemisFont.withHeight(18.0f));
+    algoTitleLabel.setColour(juce::Label::textColourId, juce::Colour(0xff00d9ff)); // Cyan come i LED
+    addAndMakeVisible(algoTitleLabel);
+
+    ringSelector.setEditableText(false);
+    ringSelector.setJustificationType(juce::Justification::centred);
+
+    for (int i = 0; i < 12; ++i) {
+        ringSelector.addItem("Ring " + juce::String(i + 1), i + 1);
+    }
+
+    ringSelector.setSelectedId(1); // Default on the first ring
+    ringSelector.onChange = [this]() {
+        selectedRingForAlgo = ringSelector.getSelectedId() - 1;
+        };
+    addAndMakeVisible(ringSelector);
+
+    ringSelectorLabel.setText("TARGET RING", juce::dontSendNotification);
+    addAndMakeVisible(ringSelectorLabel);
+
+        // Slider Pulses & Steps (Euclidean Base)
+    pulsesSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    pulsesSlider.setRange(1, 32, 1);
+    pulsesSlider.setValue(audioProcessor.getLastPulses(), juce::dontSendNotification);
+    pulsesSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 40, 20);
+    addAndMakeVisible(pulsesSlider);
+    pulsesLabel.setText("PULSES", juce::dontSendNotification);
+    addAndMakeVisible(pulsesLabel);
+
+    stepsSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    stepsSlider.setRange(1, 32, 1);
+    stepsSlider.setValue(audioProcessor.getLastSteps(), juce::dontSendNotification);
+    stepsSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 40, 20);
+    addAndMakeVisible(stepsSlider);
+    stepsLabel.setText("STEPS", juce::dontSendNotification);
+    addAndMakeVisible(stepsLabel);
+
+    // Slider Depth & Shift
+    depthSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    depthSlider.setRange(1, 4, 1);
+    depthSlider.setValue(audioProcessor.getLastDepth(), juce::dontSendNotification);
+    depthSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 40, 20);
+    addAndMakeVisible(depthSlider);
+    depthLabel.setText("HYPER-DEPTH", juce::dontSendNotification);
+    addAndMakeVisible(depthLabel);
+
+    shiftSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    shiftSlider.setRange(0, 32, 1);
+    shiftSlider.setValue(audioProcessor.getLastShift(), juce::dontSendNotification);
+    shiftSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 40, 20);
+    addAndMakeVisible(shiftSlider);
+    shiftLabel.setText("SHIFT", juce::dontSendNotification);
+    addAndMakeVisible(shiftLabel);
+
+    generateButton.setButtonText("GENERATE");
+    generateButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff1a3a3a));
+    generateButton.onClick = [this]()
+        {
+            // Invio tutti i parametri alla funzione algoritmica nel processore
+            audioProcessor.generateHyperPattern(selectedRingForAlgo,
+                (int)pulsesSlider.getValue(),
+                (int)stepsSlider.getValue(),
+                (int)depthSlider.getValue(),
+                (int)shiftSlider.getValue());
+            repaint();
+        };
+    addAndMakeVisible(generateButton);
+
     // Start timer for animation (30 FPS)
     startTimerHz(30);
 
@@ -1075,7 +1151,6 @@ void SkaldEditor::paint (juce::Graphics& g)
         // Note label when selected
         if (selectedDotIndex == static_cast<int>(i))
         {
-            // --- HUD (Velocity / MIDI Channel) ---
             if (isDraggingDot && juce::ModifierKeys::getCurrentModifiers().isAnyModifierKeyDown())
             {
                 juce::String statusText;
@@ -1355,7 +1430,7 @@ void SkaldEditor::setControlsVisible(bool visible)
 void SkaldEditor::resized()
 {
     auto area = getLocalBounds();
-    
+
     if (juce::JUCEApplication::isStandaloneApp())
         area.removeFromTop(45);
 
@@ -1384,7 +1459,7 @@ void SkaldEditor::resized()
     }
     else
     {
-        // Hide in VST mode
+        // Hide in VST/AU mode
         playStopButton.setVisible(false);
         bpmLabel.setVisible(false);
         bpmSlider.setVisible(false);
@@ -1476,19 +1551,21 @@ void SkaldEditor::resized()
     const int topControlsHeight = 100;  // Height of top controls area
     const int bottomControlsSpace = 56 + 12 + 25;  // toggle height + label height + margin
 
-    // Available vertical space for turntable (between top controls and bottom controls)
-    int availableHeight = getHeight() - topControlsHeight - bottomControlsSpace;
-    int availableWidth = getWidth() - (30 * 2);  // 30px margin on each side
+    const int sidebarWidthRight = 220;
+    const int layoutMargin = 25; // Definiamo qui il margine per evitare E0020
 
-    // Calculate turntable size (fit within available space)
+    int availableWidth = getWidth() - sidebarWidthRight - (layoutMargin * 2);
+    int availableHeight = getHeight() - topControlsHeight - bottomControlsSpace;
+
     int turntableSize = juce::jmin(availableWidth, availableHeight);
 
-    // Center turntable in available space
-    int turntableX = (getWidth() - turntableSize) / 2;
+    int turntableX = layoutMargin + (availableWidth - turntableSize) / 2;
     int turntableY = topControlsHeight + (availableHeight - turntableSize) / 2;
 
-    turntableArea = juce::Rectangle<float>(turntableX, turntableY, turntableSize, turntableSize);
+    turntableArea = juce::Rectangle<float>((float)turntableX, (float)turntableY, (float)turntableSize, (float)turntableSize);
     turntableRadius = turntableSize / 2.0f * 0.92f;
+
+    turntableCenter = turntableArea.getCentre();
 
     // Position action buttons in bottom right
     const int buttonSize = 32;
@@ -1554,6 +1631,46 @@ void SkaldEditor::resized()
     // Start/Stop (Motor) toggle
     startStopToggle.setBounds(toggleX, toggleY, toggleWidth, 56);
     startStopLabel.setBounds(toggleX, toggleY + 56, toggleWidth, toggleLabelHeight);
+
+    auto sidebarArea = getLocalBounds().removeFromRight(220).reduced(20);
+
+    sidebarArea.removeFromTop(160);
+
+    int ctrlH = 25;
+    int gap = 12;
+
+    // Title Sidebar
+    algoTitleLabel.setBounds(sidebarArea.removeFromTop(30));
+    sidebarArea.removeFromTop(20);
+
+    // Target Ring
+    ringSelectorLabel.setBounds(sidebarArea.removeFromTop(15));
+    ringSelector.setBounds(sidebarArea.removeFromTop(ctrlH));
+    sidebarArea.removeFromTop(gap);
+
+    // Pulses
+    pulsesLabel.setBounds(sidebarArea.removeFromTop(15));
+    pulsesSlider.setBounds(sidebarArea.removeFromTop(ctrlH));
+    sidebarArea.removeFromTop(gap);
+
+    // Steps
+    stepsLabel.setBounds(sidebarArea.removeFromTop(15));
+    stepsSlider.setBounds(sidebarArea.removeFromTop(ctrlH));
+    sidebarArea.removeFromTop(gap);
+
+    // Depth
+    depthLabel.setBounds(sidebarArea.removeFromTop(15));
+    depthSlider.setBounds(sidebarArea.removeFromTop(ctrlH));
+    sidebarArea.removeFromTop(gap);
+
+    // Shift
+    shiftLabel.setBounds(sidebarArea.removeFromTop(15));
+    shiftSlider.setBounds(sidebarArea.removeFromTop(ctrlH));
+    sidebarArea.removeFromTop(gap * 2);
+
+    generateButton.setBounds(sidebarArea.removeFromTop(45).reduced(10, 0));
+
+    versionLabel.setBounds(getWidth() - 120, getHeight() - 30, 100, 20);
 }
 
 void SkaldEditor::mouseDown (const juce::MouseEvent& event)
@@ -1601,14 +1718,19 @@ void SkaldEditor::mouseDown (const juce::MouseEvent& event)
     // Check if we clicked on an existing dot
     selectedDotIndex = findDotAtPoint(clickPos);
 
-    if (selectedDotIndex >= 0)
+    // Check if we clicked on an existing dot
+    selectedDotIndex = findDotAtPoint(clickPos);
+
+    auto& dots = audioProcessor.getDots();
+    if (selectedDotIndex >= 0 && selectedDotIndex < static_cast<int>(dots.size()))
     {
-        auto& dots = audioProcessor.getDots();
-        if (selectedDotIndex < static_cast<int>(dots.size()))
-            initialChannelOnDrag = dots[selectedDotIndex].midiChannel;
+        initialChannelOnDrag = dots[selectedDotIndex].midiChannel;
         initialVelocityOnDrag = dots[selectedDotIndex].velocity;
     }
-
+    else
+    {
+        selectedDotIndex = -1; // Reset di sicurezza se l'indice è sporco
+    }
     // Double-click handling
     if (event.getNumberOfClicks() == 2)
     {
@@ -1683,11 +1805,10 @@ void SkaldEditor::mouseDown (const juce::MouseEvent& event)
         // Start dragging existing dot
         isDraggingDot = true;
 
-        // Trigger preview note for selected dot
-        auto& dots = audioProcessor.getDots();
-        if (selectedDotIndex < static_cast<int>(dots.size()))
+        auto& currentDots = audioProcessor.getDots();
+        if (selectedDotIndex >= 0 && selectedDotIndex < static_cast<int>(currentDots.size()))
         {
-            audioProcessor.triggerPreviewNote(dots[selectedDotIndex].ringIndex);
+            audioProcessor.triggerPreviewNote(currentDots[selectedDotIndex].ringIndex);
         }
     }
     else
@@ -1785,7 +1906,6 @@ void SkaldEditor::mouseDrag (const juce::MouseEvent& event)
 
         if (selectedDotIndex >= (int)dots.size()) return;
 
-        // 1. SHIFT = Modify VELOCITY
         if (event.mods.isShiftDown())
         {
             int dragDelta = -event.getDistanceFromDragStartY() / 2;
@@ -1799,7 +1919,6 @@ void SkaldEditor::mouseDrag (const juce::MouseEvent& event)
             return;
         }
 
-        // 2. ALT = Modify MIDI CHANNEL (with colour offset)
         if (event.mods.isAltDown())
         {
             int dragDelta = -event.getDistanceFromDragStartY() / 15;
@@ -1808,14 +1927,12 @@ void SkaldEditor::mouseDrag (const juce::MouseEvent& event)
             if (newChannel != dots[selectedDotIndex].midiChannel)
             {
                 dots[selectedDotIndex].midiChannel = newChannel;
-                // Use index (newChannel - 1) to map the 16 colours
                 dots[selectedDotIndex].color = channelColors[(newChannel - 1) % channelColors.size()];
                 repaint();
             }
             return;
         }
 
-        // 3. NORMAL DRAG (Corner and Ring)
         auto delta = event.position - turntableCenter;
         float distanceFromCenter = delta.getDistanceFromOrigin();
         float innerRadius = turntableRadius * 0.90f;
