@@ -3,6 +3,7 @@ The idea of ​​this fork was born from the desire to fix some aspects of the 
 New features:
 - Added velocity selection for dot.
 - Added multi-channel midi output selection for dot (with midi port selection in standalone).
+- Added Hypereuclidean Logic (option to choose between standard mode (Skald MIDI Generative) or Hypereuclidean pattern generation)
 - Fixed GUI bugs on standalone.
 - ASIO & Jack support.
 Only for Windows x64.
@@ -10,10 +11,20 @@ Only for Windows x64.
 MIDI channel and velocity setting mode:
 
 --> SHIFT + Vertical Drag: Changes the individual point's velocity.
-
 --> ALT + Vertical Drag: Changes the individual point's MIDI channel.
-
 --> Drag Only: Changes the point's position on the disk.
+
+Original TODO ideas List (marked with an x ​​what has been done)
+- [X] Multiple MIDI channels per dot (color-coded) ---> made in the fork 
+- [X] Per-dot velocity ---> made in the fork
+- [ ] Per-dot gate time
+- [X] Euclidean rhythm generator (Hypereuclidean)
+- [ ] MIDI CC modulation per dot
+- [ ] Pattern preset browser
+- [ ] MIDI file export
+- [ ] Multiple concurrent turntables
+- [ ] Tempo-independent mode
+
 
 ## Skald                                                # Skald (original readme)
 
@@ -224,10 +235,10 @@ cmake --build build --config Release -j4
 
 Want to extend Skald? Ideas we're considering:
 
-- [X] Multiple MIDI channels per dot (color-coded) ---> made in the fork 
-- [X] Per-dot velocity ---> made in the fork
+- [ ] Multiple MIDI channels per dot (color-coded) ---> made in the fork 
+- [ ] Per-dot velocity ---> made in the fork
 - [ ] Per-dot gate time
-- [ ] Euclidean rhythm generator
+- [ ] Euclidean rhythm generator (Hypereuclidean)
 - [ ] MIDI CC modulation per dot
 - [ ] Pattern preset browser
 - [ ] MIDI file export
@@ -278,6 +289,7 @@ See [LICENSE](LICENSE) for full details.
 🎵 **Make something unique!** 🎵
 
 </div>
+
 
 
 
