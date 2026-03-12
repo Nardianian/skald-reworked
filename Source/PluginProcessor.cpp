@@ -8,10 +8,14 @@ SkaldProcessor::SkaldProcessor()
         .withOutput("Output", juce::AudioChannelSet::stereo(), true)
     )
 {
+    lastPulses = 4;
+    lastSteps = 16;
+    lastDepth = 1;
+    lastShift = 0;
+
     // Initialize scale
     updateScaleNotes();
 
-    // --- Standalone MIDI Setup ---
     if (juce::JUCEApplication::isStandaloneApp())
     {
         availableMidiOutputs = juce::MidiOutput::getAvailableDevices();
@@ -105,6 +109,21 @@ void SkaldProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     this->sampleRate = sampleRate;
     triggeredThisRotation.resize(dots.size(), false);
+
+    if (juce::JUCEApplication::isStandaloneApp())
+    {
+        availableMidiOutputs = juce::MidiOutput::getAvailableDevices();
+
+        if (!availableMidiOutputs.isEmpty() && standaloneMidiOut.output == nullptr)
+        {
+            standaloneMidiOut.output = juce::MidiOutput::openDevice(availableMidiOutputs[0].identifier);
+            if (standaloneMidiOut.output != nullptr)
+            {
+                standaloneMidiOut.output->startBackgroundThread();
+                standaloneMidiOut.selectedPortIndex = 0;
+            }
+        }
+    }
 }
 
 void SkaldProcessor::releaseResources()
@@ -150,10 +169,11 @@ void SkaldProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         juce::ScopedLock lock(previewNotesLock);
         for (const auto& previewNote : previewNotesToSend)
         {
+            // Usiamo il valore trasportato nel campo timeStamp come velocity
             int pVel = juce::jlimit(1, 127, previewNote.timeStamp);
             juce::MidiMessage noteOn = juce::MidiMessage::noteOn(1, previewNote.midiNote, (juce::uint8)pVel);
             midiMessages.addEvent(noteOn, 0);
-
+            // Invio manuale standalone per Preview
             if (standaloneMidiOut.output != nullptr)
                 standaloneMidiOut.output->sendMessageNow(noteOn);
 
@@ -428,7 +448,6 @@ void SkaldProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                     finalVelocity = juce::jlimit(1, 127, finalVelocity);
                 }
 
-                // Trigger note on its specific MIDI channel
                 juce::MidiMessage noteOn = juce::MidiMessage::noteOn(
                     dots[i].midiChannel,
                     midiNote,
@@ -513,6 +532,11 @@ void SkaldProcessor::getStateInformation (juce::MemoryBlock& destData)
     stream.writeFloat(probability);
     stream.writeFloat(velocityVariation);
     stream.writeFloat(swing);
+    // --- Nuovi parametri Algoritmici (Patch 33) ---
+    stream.writeInt(lastPulses);
+    stream.writeInt(lastSteps);
+    stream.writeInt(lastDepth);
+    stream.writeInt(lastShift);
 }
 
 void SkaldProcessor::setStateInformation (const void* data, int sizeInBytes)
@@ -541,13 +565,17 @@ void SkaldProcessor::setStateInformation (const void* data, int sizeInBytes)
 
     triggeredThisRotation.resize(dots.size(), false);
 
-    // Safe Read
     if (!stream.isExhausted()) globalVelocity = stream.readInt();
     if (!stream.isExhausted()) gateTimeMs = stream.readFloat();
     if (!stream.isExhausted()) isReversed = stream.readBool();
     if (!stream.isExhausted()) probability = stream.readFloat();
     if (!stream.isExhausted()) velocityVariation = stream.readFloat();
     if (!stream.isExhausted()) swing = stream.readFloat();
+
+    if (!stream.isExhausted()) lastPulses = stream.readInt();
+    if (!stream.isExhausted()) lastSteps = stream.readInt();
+    if (!stream.isExhausted()) lastDepth = stream.readInt();
+    if (!stream.isExhausted()) lastShift = stream.readInt();
 }
 
 //==============================================================================
@@ -672,6 +700,49 @@ std::vector<SkaldProcessor::TriggeredDotInfo> SkaldProcessor::getRecentlyTrigger
 
     // Return all recently triggered dots (cleanup happens in processBlock)
     return recentlyTriggeredDots;
+}
+
+void SkaldProcessor::generateHyperPattern(int ringIndex, int pulses, int steps, int depth, int rotation)
+{
+    if (ringIndex < 0 || ringIndex >= 8)
+        return;
+    
+    lastPulses = pulses;
+    lastSteps = steps;
+    lastDepth = depth;
+    lastShift = rotation;
+                                                                                                                                                                                             
+    HyperEuclidean generator(pulses, steps, depth);
+    auto pattern = generator.generateSequence();
+    auto vels = generator.velocities;
+
+    dots.erase(std::remove_if(dots.begin(), dots.end(),
+        [ringIndex](const TurntableDot& d) { return d.ringIndex == ringIndex; }),
+        dots.end());
+
+    if (steps <= 0) return;
+    float angleStep = 360.0f / static_cast<float>(steps);
+
+    for (int i = 0; i < (int)pattern.size(); ++i)
+    {
+        if (pattern[i] == 1)
+        {
+            TurntableDot newDot;
+            newDot.ringIndex = ringIndex;
+
+            float finalAngle = std::fmod((i * angleStep) + (rotation * angleStep), 360.0f);
+            newDot.angle = finalAngle;
+
+            newDot.velocity = (vels[i] > 0) ? vels[i] : 80;
+
+            newDot.active = true;
+            newDot.midiChannel = ringIndex + 1;
+            newDot.color = juce::Colour::fromHSV(ringIndex * 0.15f, 0.8f, 0.9f, 1.0f);
+
+            dots.push_back(newDot);
+        }
+    }
+    triggeredThisRotation.resize(dots.size(), false);
 }
 
 //==============================================================================
