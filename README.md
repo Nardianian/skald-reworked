@@ -11,7 +11,9 @@ Only for Windows x64.
 MIDI channel and velocity setting mode:
 
 --> SHIFT + Vertical Drag: Changes the individual point's velocity.
+
 --> ALT + Vertical Drag: Changes the individual point's MIDI channel.
+
 --> Drag Only: Changes the point's position on the disk.
 
 Original TODO ideas List (marked with an x ​​what has been done)
@@ -289,6 +291,7 @@ See [LICENSE](LICENSE) for full details.
 🎵 **Make something unique!** 🎵
 
 </div>
+
 
 
 
