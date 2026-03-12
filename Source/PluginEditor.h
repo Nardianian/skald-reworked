@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "PluginProcessor.h"
+#include "EuclideanSet.h"
 
 //==============================================================================
 // Forward declaration
@@ -124,6 +125,8 @@ private:
     juce::Label bpmLabel;
     juce::Slider bpmSlider;
 
+    juce::Label versionLabel; // Patch 47
+
     // New quick-win controls (row 2)
     MusicKnob velocityKnob;
     juce::Label velocityLabel;
@@ -152,6 +155,15 @@ private:
     juce::TextButton backButton;
     juce::Label backLabel;
     bool showingHelpScreen = false;
+
+    // --- Algorithmic Section ---
+    juce::Slider pulsesSlider, stepsSlider, depthSlider, shiftSlider;
+    juce::Label pulsesLabel, stepsLabel, depthLabel, shiftLabel;
+    juce::ComboBox ringSelector;
+    juce::Label ringSelectorLabel;
+    juce::TextButton generateButton;
+    juce::Label algoTitleLabel;
+    int selectedRingForAlgo = 0; // Ring attualmente sotto editing (0-11)
 
     // Current selection indices
     int currentSpeedIndex = 2; // Default to 1x
@@ -213,4 +225,5 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SkaldEditor)
 };
+
 
