@@ -4,7 +4,6 @@
 HyperEuclidean::HyperEuclidean(int p, int s, int d)
     : pulses(p), steps(s), depth(d)
 {
-    // Clamp di sicurezza
     if (steps < 1) steps = 1;
     pulses = juce::jlimit(0, steps, pulses);
 }
@@ -14,7 +13,6 @@ std::vector<int> HyperEuclidean::generateSequence() {
     return sequence;
 }
 
-// Algoritmo di Bjorklund interno (ex Euclidean base)
 std::vector<int> HyperEuclidean::generateClassic(int p, int s) {
     std::vector<int> seq;
     if (s <= 0) return seq;
@@ -55,7 +53,6 @@ void HyperEuclidean::computeHyperEuclidean() {
     sequence.clear();
     velocities.clear();
 
-    // 1. Generazione base
     std::vector<int> onsets;
     std::vector<int> basePattern = generateClassic(pulses, steps);
 
@@ -68,7 +65,6 @@ void HyperEuclidean::computeHyperEuclidean() {
         return;
     }
 
-    // 2. Logica Hyper (Riduzione IOI)
     for (int d = 1; d < depth; ++d) {
         int n = (int)onsets.size();
         if (n <= 1) break;
@@ -87,13 +83,11 @@ void HyperEuclidean::computeHyperEuclidean() {
         onsets = nextOnsets;
     }
 
-    // 3. Ricostruzione finale e Velocity
     sequence.assign(steps, 0);
     velocities.assign(steps, 0);
 
     if (onsets.empty()) return;
 
-    // Calcolo IOI per accentuazione
     std::vector<int> finalIoi;
     for (size_t i = 0; i < onsets.size(); ++i) {
         int nextIdx = (i + 1) % onsets.size();
@@ -111,4 +105,5 @@ void HyperEuclidean::computeHyperEuclidean() {
         float norm = (maxIOI > 0) ? (float)finalIoi[i] / (float)maxIOI : 1.0f;
         velocities[idx] = (int)(40 + norm * 75);
     }
+
 }
