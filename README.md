@@ -6,7 +6,7 @@ New features:
 - Added Hypereuclidean Logic (option to choose between standard mode (Skald MIDI Generative) or Hypereuclidean pattern generation)
 - Fixed GUI bugs on standalone.
 - ASIO & Jack support.
-Only for Windows x64.
+Here only for Windows x64 (but being a Juce project it can be easily adapted for Mac and Linux).
 
 MIDI channel and velocity setting mode:
 
@@ -26,6 +26,10 @@ Original TODO ideas List (marked with an x ​​what has been done)
 - [ ] MIDI file export
 - [ ] Multiple concurrent turntables
 - [ ] Tempo-independent mode
+
+<div align="center">
+<img src="Skald (with MIDI Channel out activate).jpg" alt="Skald Main Interface" width="700"/>
+</div>
 
 
 ## Skald                                                # Skald (original readme)
@@ -291,6 +295,7 @@ See [LICENSE](LICENSE) for full details.
 🎵 **Make something unique!** 🎵
 
 </div>
+
 
 
 
