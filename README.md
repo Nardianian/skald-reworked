@@ -3,7 +3,7 @@ The idea of ​​this fork was born from the desire to fix some aspects of the 
 New features:
 - Added velocity selection for dot.
 - Added multi-channel midi output selection for dot (with midi port selection in standalone).
-- Added Hypereuclidean Logic (option to choose between standard mode (Skald MIDI Generative) or Hypereuclidean pattern generation)
+- Added Hypereuclidean Logic: ption to choose between standard mode (Skald MIDI Generative) or Hypereuclidean pattern generation (pattern GENERATE button)
 - Fixed GUI bugs on standalone. GUI resizable.
 - ASIO & Jack support.
 Here only for Windows x64 (but being a Juce project it can be easily adapted for Mac and Linux).
@@ -295,6 +295,7 @@ See [LICENSE](LICENSE) for full details.
 🎵 **Make something unique!** 🎵
 
 </div>
+
 
 
 
