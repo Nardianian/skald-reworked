@@ -7,9 +7,11 @@ New features:
 - Fixed GUI bugs on standalone. GUI resizable.
 - ASIO & Jack support.
   
-Here only for Windows x64 (but being a Juce project it can be easily adapted for Mac and Linux), using CMake v4.2.0, Juce v8.0.12 and Visual Studio 2026 Insiders.
+Here only for Windows x64, using CMake v4.2.0, Juce v8.0.12 and Visual Studio 2026 Insiders on Windows 11 (but being a Juce project it can be easily adapted for Mac and Linux).
 
 MIDI channel and velocity setting mode:
+
+--> Clic on a single dot
 
 --> SHIFT + Vertical Drag: Changes the individual point's velocity.
 
@@ -296,6 +298,7 @@ See [LICENSE](LICENSE) for full details.
 🎵 **Make something unique!** 🎵
 
 </div>
+
 
 
 
