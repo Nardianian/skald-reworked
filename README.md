@@ -3,8 +3,8 @@ The idea of ​​this fork was born from the desire to fix some aspects of the 
 New features:
 - Added velocity selection for dot.
 - Added multi-channel midi output selection for dot (with midi port selection in standalone).
-- Added Hypereuclidean Logic: option to choose between standard mode (Skald MIDI Generative) or Hypereuclidean pattern generation (pattern GENERATE button)
-- Fixed GUI bugs on standalone. GUI resizable.
+- Added Hypereuclidean option to choose between standard mode (Skald MIDI Generative) or Hypereuclidean pattern generation (pattern GENERATE button)
+- Fixed GUI bugs on standalone and GUI resizable.
 - ASIO & Jack support.
   
 Here only for Windows x64, using CMake v4.2.0, Juce v8.0.12 and Visual Studio 2026 Insiders on Windows 11 (but being a Juce project it can be easily adapted for Mac and Linux).
@@ -23,7 +23,7 @@ Original TODO ideas List (marked with an x ​​what has been done)
 - [X] Multiple MIDI channels per dot (color-coded) ---> made in the fork 
 - [X] Per-dot velocity ---> made in the fork
 - [ ] Per-dot gate time
-- [X] Euclidean rhythm generator (Hypereuclidean)
+- [X] Hypereuclidean rhythm generator (advanced customized Euclidean)
 - [ ] MIDI CC modulation per dot
 - [ ] Pattern preset browser
 - [ ] MIDI file export
