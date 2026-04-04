@@ -57,17 +57,17 @@ important that the manual be located in the same folder as the plugin or
 executable (for standalone versions) and that the file name
 "Skald_Manual.pdf" is not changed.
 
-Original “TODO” ideas List (marked with an x what has been done here)
+Original “TODO” ideas List (marked with an x what has been done here):
 
-X Multiple MIDI channels per dot (color-coded) 
+X  Multiple MIDI channels per dot (color-coded) 
 
-X Per-dot velocity
+X  Per-dot velocity
 
-X Per-dot gate time
+X  Per-dot gate time
 
-X Hypereuclidean pattern generator (advanced customized Euclidean) 
+X  Hypereuclidean pattern generator (advanced customized Euclidean) 
  
-X MIDI file export
+X  MIDI file export
 
 > MIDI CC modulation per dot
 >
