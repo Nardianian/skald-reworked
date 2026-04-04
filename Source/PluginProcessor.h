@@ -3,6 +3,7 @@
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_graphics/juce_graphics.h>
+#include "EuclideanSet.h"
 
 //==============================================================================
 // Scale types
@@ -32,9 +33,11 @@ struct TurntableDot
     int midiChannel;    // MIDI Channel (1-16)
     bool active;        // Whether this dot is active
     int velocity;       // Individual velocity (1-127)
+    float gateTime;     // Individual gate time (0.0 to 1.0 multiplier)
 
     TurntableDot() : angle(0.0f), ringIndex(0),
-                     color(juce::Colours::red), midiChannel(1), active(true), velocity(100) {}
+        color(juce::Colours::red), midiChannel(1), active(true),
+        velocity(100), gateTime(0.5f) {}
 };
 
 //==============================================================================
@@ -51,6 +54,17 @@ public:
         bool wasTriggered;      // True if probability allowed trigger
         int beatCount;          // Beat counter state (for swing visualization)
     };
+
+    // Struttura per gestire i parametri di generazione per ogni anello (Punto 1-4)
+    struct RingSettings {
+        bool isEuclidean = false; // Selettore modalità (Standard vs Euclideo)
+        int pulses = 4;           // Numero di impulsi
+        int steps = 16;           // Numero di step della griglia
+        int depth = 1;            // Profondità Hyper-Euclidean
+        int shift = 0;            // Rotazione/Shift del pattern
+    };
+
+    RingSettings ringSettings[12]; // Gestiamo fino a 12 anelli (corrispondenti alle note della scala)
 
     SkaldProcessor();
     ~SkaldProcessor() override;
@@ -88,6 +102,7 @@ public:
     void addDot(float angle, int ringIndex, juce::Colour color);
     void removeDot(int index);
     void clearAllDots();
+    void exportMidiFile(const juce::File& targetFile);
     std::vector<TurntableDot>& getDots() { return dots; }
 
     // Scale and key management
@@ -97,7 +112,9 @@ public:
     ScaleType getScale() const { return currentScale; }
     int getRootNote() const { return rootNote; }
     int getOctaveShift() const { return octaveShift; }
-    int getNumRings() const { return scaleNotes.size(); }
+    // Patch 6.5: Forziamo il numero di anelli a 7 (0=Scratch, 1-6=Note)
+    // Questo garantisce che la grafica del Editor e la logica del Processor siano sempre allineate.
+    int getNumRings() const { return 9; }
 
     // Convert ring index to MIDI note based on current scale/key
     int ringToMidiNote(int ringIndex) const;
@@ -148,6 +165,12 @@ public:
     void setSwing(float sw) { swing = juce::jlimit(0.0f, 100.0f, sw); }
     float getSwing() const { return swing; }
 
+    // Getter per parametri algoritmici
+    int getLastPulses() const { return lastPulses; }
+    int getLastSteps() const { return lastSteps; }
+    int getLastDepth() const { return lastDepth; }
+    int getLastShift() const { return lastShift; }
+
     // Standalone transport control
     void setPlaying(bool shouldPlay) { isPlayingStandalone = shouldPlay; }
     bool isPlaying() const { return isPlayingStandalone; }
@@ -165,7 +188,17 @@ public:
     // Get recently triggered dots for visual feedback
     std::vector<TriggeredDotInfo> getRecentlyTriggeredDots() const;
 
-    // Device Manager to force MIDI in Standalone
+    void generateHyperPattern(int ringIndex, int pulses, int steps, int depth, int rotation);
+
+    // Patch: Funzione refresh per accesso dall'Editor
+    void refreshMidiOutputs();
+
+    // Patch: Gestione MIDI Standalone
+    void changeMidiPort(int index);
+    juce::Array<juce::MidiDeviceInfo>& getAvailableMidiOutputs() { return availableMidiOutputs; }
+    int getSelectedMidiPortIndex() const { return standaloneMidiOut.selectedPortIndex; }
+
+    // Gestore dispositivi per forzare il MIDI in Standalone
     juce::AudioDeviceManager deviceManager;
 
 
@@ -204,6 +237,12 @@ private:
     float velocityVariation = 0.0f; // Velocity randomization amount (0-100%)
     float swing = 0.0f;             // Swing amount (0-100%)
 
+    // --- Memoria parametri algoritmici (Patch 35) ---
+    int lastPulses = 4;
+    int lastSteps = 16;
+    int lastDepth = 1;
+    int lastShift = 0;
+
     // Standalone mode variables
     bool isPlayingStandalone = false;
     double standaloneBPM = 120.0;
@@ -240,7 +279,7 @@ private:
     // Track swing state (which beat we're on for swing timing)
     int swingBeatCounter = 0;
 
-    // --- Manual MIDI management ---
+    // --- Gestione MIDI Manuale ---
     struct CustomMidiOut
     {
         std::unique_ptr<juce::MidiOutput> output;
@@ -248,7 +287,6 @@ private:
     };
     CustomMidiOut standaloneMidiOut;
     juce::Array<juce::MidiDeviceInfo> availableMidiOutputs;
-    void refreshMidiOutputs();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SkaldProcessor)
 };
