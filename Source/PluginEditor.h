@@ -5,6 +5,7 @@
 #include "PluginProcessor.h"
 #include "EuclideanSet.h"
 
+
 //==============================================================================
 // Forward declaration
 class SkaldEditor;
@@ -148,15 +149,14 @@ private:
     juce::Label saveLabel;
     juce::TextButton loadPatternButton;
     juce::Label loadLabel;
+    juce::TextButton exportMidiButton;
+    juce::Label exportMidiLabel;
     juce::TextButton aboutButton;
     juce::Label aboutLabel;
+    juce::TextButton refreshMidiButton;     // Patch: Pulsante per aggiornamento porte MIDI
+    juce::Label refreshMidiLabel;
 
-    // Help/About screen
-    juce::TextButton backButton;
-    juce::Label backLabel;
-    bool showingHelpScreen = false;
-
-    // --- Algorithmic Section ---
+    // --- Sezione Algoritmica (Punto 2 e 3) ---
     juce::Slider pulsesSlider, stepsSlider, depthSlider, shiftSlider;
     juce::Label pulsesLabel, stepsLabel, depthLabel, shiftLabel;
     juce::ComboBox ringSelector;
@@ -181,6 +181,8 @@ private:
     bool isDraggingDot = false;
     int initialChannelOnDrag = 1;
     int initialVelocityOnDrag;
+    float initialGateOnDrag = 0.5f;
+    float initialMouseYOnDrag = 0.0f;
     int currentMidiChannel = 1;
 
     // Scratching state
@@ -216,14 +218,12 @@ private:
     int findDotAtPoint(juce::Point<float> point);
     float getRingSpacing() const;
     juce::String midiNoteToString(int midiNote) const;
-    void paintHelpScreen(juce::Graphics& g);
     void setControlsVisible(bool visible);
-
+        
     // Visual feedback helpers
     float calculateGlowBrightness(int velocity) const;
     float getSwingOffset(int beatCount, float swingAmount) const;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SkaldEditor)
 };
-
 
