@@ -59,12 +59,15 @@ executable (for standalone versions) and that the file name
 
 Original “TODO” ideas List (marked with an x what has been done here)
 
-Multiple MIDI channels per dot (color-coded) Per-dot velocity
+X Multiple MIDI channels per dot (color-coded) 
 
-Per-dot gate time
+X Per-dot velocity
 
-Hypereuclidean rhythm generator (advanced customized Euclidean) MIDI
-file export
+X Per-dot gate time
+
+X Hypereuclidean pattern generator (advanced customized Euclidean) 
+ 
+X MIDI file export
 
 > MIDI CC modulation per dot
 >
