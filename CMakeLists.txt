@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(Skald VERSION 1.0.4)
+project(Skald VERSION 1.1.6)
 
 # Add JUCE as a subdirectory
 add_subdirectory(../JUCE ${CMAKE_CURRENT_BINARY_DIR}/JUCE)
@@ -29,6 +29,7 @@ juce_add_plugin(Skald
     COMPANY_NAME "BeowulfAudio"
     PLUGIN_MANUFACTURER_CODE Bwlf
     PLUGIN_CODE Skld
+    VERSION ${PROJECT_VERSION}
     FORMATS VST3 VST AAX LV2 Standalone
     PRODUCT_NAME "Skald"
     IS_SYNTH TRUE
@@ -52,6 +53,8 @@ target_sources(Skald PRIVATE
     Source/PluginProcessor.h
     Source/PluginEditor.cpp
     Source/PluginEditor.h
+    Source/EuclideanSet.cpp
+    Source/EuclideanSet.h
 )
 
 # Compiler definitions
@@ -61,12 +64,17 @@ target_compile_definitions(Skald PUBLIC
     JUCE_ASIO=1
     JUCE_JACK=1
     JUCE_USE_WINRT_MIDI=1
-    JUCE_FORCE_WINRT_MIDI=1
+    JUCE_USE_WINDOWS_MIDI_SERVICES=0
+    JUCE_DIRECT2D=0
+    JUCE_FORCE_WINRT_MIDI=0
+    JUCE_STRICT_REFCOUNTEDPOINTER=1
     JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
 # Link required JUCE modules
 target_link_libraries(Skald PRIVATE
+    runtimeobject 
+    WindowsApp
     BinaryData
     juce::juce_audio_basics
     juce::juce_audio_devices
