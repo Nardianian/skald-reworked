@@ -25,10 +25,12 @@ New features:
 >
 > Added Pulses and Steps to define how many strokes to distribute evenly
 > in a number of subdivisions (e.g. 3 strokes over 8 steps)
->
+> 
+> Added MIDI export
+> 
 > Fixed GUI bugs on standalone and made GUI resizable.
 >
-> ASIO & Jack support on Windows.
+> MIDI Multi-client, ASIO & Jack (audio driver) support on Windows.
 
 Here only for Windows x64, using CMake v4.2.0, Juce v8.0.12 and Visual
 Studio 2026 Insiders on Windows 11 (but being a Juce project it can be
