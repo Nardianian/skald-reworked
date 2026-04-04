@@ -72,14 +72,7 @@ file export
 >
 > Tempo-independent mode
 > 
-    
-> <img src="./zn0yscou.png"
-      
-> style="width:4.49236in;height:0.66319in" /><img src="./rlez0syp.png"
-                                                 
-> style="width:3.13403in;height:0.67708in" /><img src="./cvolplns.png"
-                                                 
-> style="width:1.14861in;height:0.47569in" /><img src="./dtpa20pq.png"
+
                                                  
 > style="width:4.49236in;height:0.85625in" /><img src="./w0ln1pwi.png"
                                                  
