@@ -45,8 +45,11 @@ stays "pressed)
 --> ALT + Vertical Drag: Changes the individual point's MIDI channel.
 
 --> Drag Only: Changes the point's position on the disk.
+
 <img src="./kbjctot3.png"
-style="width:6.07361in;height:5.61806in" /><img src="./lnrf2fxq.png"
+style="width:6.07361in;height:5.61806in" />
+
+<img src="./lnrf2fxq.png"
 style="width:5.57292in;height:1.29653in" />
 
 The "Help" button has been radically changed: previously, it opened a fixed screen with a list of
