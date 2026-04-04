@@ -50,9 +50,6 @@ stays "pressed)
 <img src="./kbjctot3.png"
 style="width:6.07361in;height:5.61806in" />
 
-<img src="./lnrf2fxq.png"
-style="width:5.57292in;height:1.29653in" />
-
 The "Help" button has been radically changed: previously, it opened a fixed screen with a list of
 features and instructions for use. Since more functions and buttons have
 been added, clicking "Help" now opens a PDF manual. However, it is
