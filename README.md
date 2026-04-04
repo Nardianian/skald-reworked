@@ -6,7 +6,9 @@ The idea of this fork was born from the desire to fix some aspects of
 the standalone GUI (buttons, boxes and labels overlapping at the top
 left) and therefore from the attempt to implement some development ideas
 suggested by the author of the original repository (see the bottom of
-the readme). New features:
+the readme). 
+
+New features:
 
 > Added velocity selection for dot.
 >
@@ -33,16 +35,16 @@ easily adapted for Mac and Linux).
 
 MIDI Channel, Velocity, Gate Time and in-ring position change modes:
 
---\> Click on a single dot
+--> Click on a single dot
 
---\> SHIFT + Vertical Drag: Changes the individual point's velocity.
+--> SHIFT + Vertical Drag: Changes the individual point's velocity.
 
---\> CTRL/CMD + Drag: Adjusts Gate Time (how long that specific note
+--> CTRL/CMD + Drag: Adjusts Gate Time (how long that specific note
 stays "pressed)
 
---\> ALT + Vertical Drag: Changes the individual point's MIDI channel.
+--> ALT + Vertical Drag: Changes the individual point's MIDI channel.
 
---\> Drag Only: Changes the point's position on the disk.
+--> Drag Only: Changes the point's position on the disk.
 <img src="./kbjctot3.png"
 style="width:6.07361in;height:5.61806in" /><img src="./lnrf2fxq.png"
 style="width:5.57292in;height:1.29653in" />
