@@ -1,5 +1,5 @@
 [Readme.md](https://github.com/user-attachments/files/26481085/Readme.md)
-Readme<img src="./jbg2fcs2.png"
+<img src="./jbg2fcs2.png"
 style="width:7.14722in;height:4.75278in" />
 
 The idea of this fork was born from the desire to fix some aspects of
@@ -46,8 +46,9 @@ stays "pressed)
 
 <img src="./kbjctot3.png"
 style="width:6.07361in;height:5.61806in" /><img src="./lnrf2fxq.png"
-style="width:5.57292in;height:1.29653in" />The "Help" button has been
-radically changed: previously, it opened a fixed screen with a list of
+style="width:5.57292in;height:1.29653in" />
+
+The "Help" button has been radically changed: previously, it opened a fixed screen with a list of
 features and instructions for use. Since more functions and buttons have
 been added, clicking "Help" now opens a PDF manual. However, it is
 important that the manual be located in the same folder as the plugin or
@@ -70,6 +71,7 @@ file export
 > Multiple concurrent turntables
 >
 > <img src="./rbsi5icv.png"
+    
 > style="width:2.65625in;height:5.82361in" /><img src="./zn0yscou.png"
 > style="width:4.49236in;height:0.66319in" /><img src="./rlez0syp.png"
 > style="width:3.13403in;height:0.67708in" /><img src="./cvolplns.png"
