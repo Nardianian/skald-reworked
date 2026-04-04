@@ -54,12 +54,15 @@ style="width:6.07361in;height:5.61805in" />
 
 Original TODO ideas List (marked with an x what has been done here)
 
-Multiple MIDI channels per dot (color-coded) Per-dot velocity
+X Multiple MIDI channels per dot (color-coded) 
 
-Per-dot gate time
+X Per-dot velocity
 
-Hypereuclidean rhythm generator (advanced customized Euclidean) MIDI
-file export
+X Per-dot gate time
+
+X Hypereuclidean rhythm generator (advanced customized Euclidean) 
+
+X MIDI file export
 
 > MIDI CC modulation per dot
 >
