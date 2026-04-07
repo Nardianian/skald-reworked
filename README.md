@@ -17,7 +17,7 @@ New features:
 >
 > Added channel midi output selection for dot
 >
-> Added midi port selection (on standalone).
+> Added midi port selection (on standalone, plugins works with DAW MIDI port).
 >
 > Added Hypereuclidean option: you can choose between the starting
 > standard mode (the normal Skald MIDI Generative) or the Hypereuclidean
@@ -30,7 +30,7 @@ New features:
 > 
 > Fixed GUI bugs on standalone and made GUI resizable.
 >
-> MIDI Multi-client, ASIO & Jack (audio driver) support on Windows.
+> MIDI Multi-client, ASIO & Jack (Jack audio driver only) support on Windows.
 
 Here only for Windows x64, using CMake v4.2.0, Juce v8.0.12 and Visual
 Studio 2026 Insiders on Windows 11 (but being a Juce project it can be
@@ -59,7 +59,9 @@ important that the manual be located in the same folder as the plugin or
 executable (for standalone versions) and that the file name
 "Skald_Manual.pdf" is not changed.
 
-Original “TODO” ideas List (marked with an x what has been done here):
+Todo: -> MIDI Learn system
+
+Original “TODO” ideas list (marked with an X what has been done here):
 
 X   Multiple MIDI channels per dot (color-coded) 
 
