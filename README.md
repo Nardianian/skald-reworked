@@ -69,7 +69,8 @@ X   Per-dot velocity
 
 X   Per-dot gate time
 
-X   Hypereuclidean pattern generator (advanced customized Euclidean) 
+X   Euclidean rhythm generator (here in this reworked version implemented as an Hypereuclidean pattern generator, an advanced customized  
+    Euclidean) 
  
 X   MIDI file export
 
