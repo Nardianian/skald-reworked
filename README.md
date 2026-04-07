@@ -24,7 +24,7 @@ New features:
 > pattern generation (pattern GENERATE button)
 >
 > Added Pulses and Steps to define how many strokes to distribute evenly
-> in a number of subdivisions (e.g. 3 strokes over 8 steps)
+> in a number of subdivisions (e.g. 3 strokes over 8 steps), in Hypereuclidean pattern mode
 > 
 > Added MIDI export
 > 
