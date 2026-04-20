@@ -4,6 +4,9 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_graphics/juce_graphics.h>
 #include "EuclideanSet.h"
+#include "RtMidi.h"
+#include <atomic>
+#include <map> 
 
 //==============================================================================
 // Scale types
@@ -55,16 +58,31 @@ public:
         int beatCount;          // Beat counter state (for swing visualization)
     };
 
-    // Struttura per gestire i parametri di generazione per ogni anello (Punto 1-4)
+    // Structure to manage generation parameters for each ring
     struct RingSettings {
-        bool isEuclidean = false; // Selettore modalità (Standard vs Euclideo)
-        int pulses = 4;           // Numero di impulsi
-        int steps = 16;           // Numero di step della griglia
-        int depth = 1;            // Profondità Hyper-Euclidean
-        int shift = 0;            // Rotazione/Shift del pattern
+        bool isEuclidean = false; // Mode Selector (Standard vs. Euclidean)
+        int pulses = 4;           // Number of pulses
+        int steps = 16;           // Number of grid steps
+        int depth = 1;            // Hyper-Euclidean Depth
+        int shift = 0;            // Pattern Rotation/Shift
     };
 
     RingSettings ringSettings[12]; // Gestiamo fino a 12 anelli (corrispondenti alle note della scala)
+
+    // --- MIDI LEARN SYSTEM ---
+    struct MidiMapping {
+        int ccNumber = -1;
+        juce::String paramID;
+    };
+
+    // Map to associate ParamID -> CC Number
+    std::map<juce::String, int> midiMappings;
+
+    bool isMidiLearning = false;
+    juce::String lastParamToLearn = "";
+
+    // Helper to apply MIDI values ​​to GUI object type  
+    void applyMidiControl(const juce::String& paramID, int value);
 
     SkaldProcessor();
     ~SkaldProcessor() override;
@@ -112,8 +130,8 @@ public:
     ScaleType getScale() const { return currentScale; }
     int getRootNote() const { return rootNote; }
     int getOctaveShift() const { return octaveShift; }
-    // Patch 6.5: Forziamo il numero di anelli a 7 (0=Scratch, 1-6=Note)
-    // Questo garantisce che la grafica del Editor e la logica del Processor siano sempre allineate.
+    // Force the number of rings to 9 (0=Scratch, 1-8=Note)
+    // This ensures that the Editor graphics and the Processor logic are always aligned.
     int getNumRings() const { return 9; }
 
     // Convert ring index to MIDI note based on current scale/key
@@ -165,7 +183,7 @@ public:
     void setSwing(float sw) { swing = juce::jlimit(0.0f, 100.0f, sw); }
     float getSwing() const { return swing; }
 
-    // Getter per parametri algoritmici
+    // Getter for algorithmic parameters
     int getLastPulses() const { return lastPulses; }
     int getLastSteps() const { return lastSteps; }
     int getLastDepth() const { return lastDepth; }
@@ -177,6 +195,16 @@ public:
 
     // BPM control for standalone
     void setStandaloneBPM(double bpm) { standaloneBPM = bpm; }
+
+    // Functions to activate Learn from outside
+    void startMidiLearn(const juce::String& paramID) {
+        lastParamToLearn = paramID;
+        isMidiLearning = true;
+    }
+
+    void stopMidiLearn() { isMidiLearning = false; }
+    void clearMidiMapping(const juce::String& paramID) { midiMappings.erase(paramID); }
+    void clearAllMidiMappings() { midiMappings.clear(); isMidiLearning = false; }
     double getStandaloneBPM() const { return standaloneBPM; }
 
     // Get effective BPM (standalone or host)
@@ -190,15 +218,15 @@ public:
 
     void generateHyperPattern(int ringIndex, int pulses, int steps, int depth, int rotation);
 
-    // Patch: Funzione refresh per accesso dall'Editor
+    // Refresh function for access from the Editor
     void refreshMidiOutputs();
 
-    // Patch: Gestione MIDI Standalone
+    // MIDI Standalone Management
     void changeMidiPort(int index);
     juce::Array<juce::MidiDeviceInfo>& getAvailableMidiOutputs() { return availableMidiOutputs; }
     int getSelectedMidiPortIndex() const { return standaloneMidiOut.selectedPortIndex; }
 
-    // Gestore dispositivi per forzare il MIDI in Standalone
+    // Device Manager to force MIDI in Standalone
     juce::AudioDeviceManager deviceManager;
 
 
@@ -225,7 +253,7 @@ private:
     bool isReversed = false;        // Reverse rotation direction
 
     // Motor control (record player style)
-    bool motorRunning = true;           // Motor on/off state
+    bool motorRunning = true;            // Motor on/off state
     float currentSpeedMultiplier = 1.0f; // Current speed (ramps up/down like record player)
 
     // Scratching/manual control
@@ -237,7 +265,7 @@ private:
     float velocityVariation = 0.0f; // Velocity randomization amount (0-100%)
     float swing = 0.0f;             // Swing amount (0-100%)
 
-    // --- Memoria parametri algoritmici (Patch 35) ---
+    // --- Algorithmic parameter memory ---
     int lastPulses = 4;
     int lastSteps = 16;
     int lastDepth = 1;
@@ -276,10 +304,14 @@ private:
     // Random number generator for probability and velocity variation
     juce::Random random;
 
+    // Helper to save/load MIDI mappings in plugin state
+    void saveMidiMappings(juce::XmlElement& xml);
+    void loadMidiMappings(juce::XmlElement& xml);
+
     // Track swing state (which beat we're on for swing timing)
     int swingBeatCounter = 0;
 
-    // --- Gestione MIDI Manuale ---
+    // --- Manual MIDI management ---
     struct CustomMidiOut
     {
         std::unique_ptr<juce::MidiOutput> output;
@@ -287,6 +319,20 @@ private:
     };
     CustomMidiOut standaloneMidiOut;
     juce::Array<juce::MidiDeviceInfo> availableMidiOutputs;
+
+	// Forced Dual Stack for maximum compatibility (WMS/UWP and WinMM)
+    std::unique_ptr<rt::midi::RtMidiIn> rtMidiInUWP;    // Per Multi-Client (WMS/UWP)
+    std::unique_ptr<rt::midi::RtMidiIn> rtMidiInLegacy; // Per loopMIDI (WinMM)
+
+    // Static callback for RtMidi
+    static void midiCallback(double deltatime, std::vector<unsigned char>* message, void* userData);
+
+    // Port initialization method
+    void setupRtMidi();
+
+    std::atomic<float> midiSpeed{ 1.0f };       // Memorizza la velocità in modo sicuro
+    std::atomic<float> midiProbability{ 0.5f }; // Memorizza la probabilità in modo sicuro
+    juce::CriticalSection midiCallbackLock;     // Protegge dati non atomici se necessario
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SkaldProcessor)
 };
