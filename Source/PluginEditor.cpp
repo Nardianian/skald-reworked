@@ -125,15 +125,12 @@ SkaldEditor::SkaldEditor (SkaldProcessor& p)
 {
     setResizable(true, true);
 
-    // Otteniamo l'area reale di lavoro (escludendo la barra delle applicazioni)
+    // We get the actual work area (excluding the taskbar)
     auto displayArea = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->userArea;
 
-    // Se lo schermo è piccolo o lo scaling è alto, limitiamo la finestra.
-    // Impostiamo una dimensione fissa più sicura per il primo avvio.
     int defaultW = 1400;
     int defaultH = 800;
 
-    // Se 1400 è comunque troppo grande per lo schermo corrente, scala al 90% del monitor
     int initialW = std::min(defaultW, (int)(displayArea.getWidth() * 0.9f));
     int initialH = std::min(defaultH, (int)(displayArea.getHeight() * 0.9f));
 
@@ -213,7 +210,7 @@ SkaldEditor::SkaldEditor (SkaldProcessor& p)
         juce::Random random;
         float angle = random.nextFloat() * 360.0f;
         int numRings = audioProcessor.getNumRings();
-        // Patch 6.4b: Forza l'aggiunta tra Ring 1 e 8 (evita 0-Scratch)
+        // Force addition between Ring 1 and 8 (avoid 0-Scratch)
         int ringIndex = random.nextInt(8) + 1;
 
         // Color based on ring
@@ -245,7 +242,7 @@ SkaldEditor::SkaldEditor (SkaldProcessor& p)
         for (int i = 0; i < numDots; ++i)
         {
             float angle = random.nextFloat() * 360.0f;
-            // Patch 6.4c: Forza la randomizzazione tra Ring 1 e 8 (evita 0-Scratch)
+            // Forza la randomizzazione tra Ring 1 e 8 (evita 0-Scratch)
             int ringIndex = random.nextInt(8) + 1;
             juce::Colour color = juce::Colour(0xffff6b35);
             audioProcessor.addDot(angle, ringIndex, color);
@@ -426,7 +423,7 @@ SkaldEditor::SkaldEditor (SkaldProcessor& p)
     saveLabel.setFont(juce::FontOptions("Arial", 9.0f, juce::Font::bold));
     addAndMakeVisible(saveLabel);
 
-    // Export MIDI button (Patch 15-A)
+    // Export MIDI button
     exportMidiButton.setButtonText("");
     exportMidiButton.setLookAndFeel(&hardwareLookAndFeel);
     exportMidiButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff15253a));
@@ -492,10 +489,10 @@ SkaldEditor::SkaldEditor (SkaldProcessor& p)
     aboutButton.setLookAndFeel(&hardwareLookAndFeel);
     aboutButton.onClick = [this]()
         {
-            // Opzione A: Apre un link web (es. documentazione su GitHub o sito)
+            // Option A: Opens a web link (e.g., documentation on GitHub or a website)
             // juce::URL("https://github.com/TuoProfilo/Skald-Manual").launchInDefaultBrowser();
 
-            // Opzione B: Se preferisci aprire un PDF locale nella cartella del plugin:
+            // Option B: If you prefer to open a local PDF in the plugin folder:
             auto manualFile = juce::File::getSpecialLocation(juce::File::currentExecutableFile)
                                 .getParentDirectory().getChildFile("Skald_Manual.pdf");
             if (manualFile.existsAsFile())
@@ -509,7 +506,7 @@ SkaldEditor::SkaldEditor (SkaldProcessor& p)
     aboutLabel.setFont(juce::FontOptions("Arial", 9.0f, juce::Font::bold));
     addAndMakeVisible(aboutLabel);
 
-    // Patch: Setup pulsante Refresh MIDI
+    // MIDI Refresh Button Setup
     refreshMidiButton.setButtonText("");
     refreshMidiButton.setLookAndFeel(&hardwareLookAndFeel);
     refreshMidiButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff15253a));
@@ -534,15 +531,15 @@ SkaldEditor::SkaldEditor (SkaldProcessor& p)
     // Configurazione Label REFRESH (Patch Colore e Font)
     refreshMidiLabel.setText("REFRESH", juce::dontSendNotification);
     refreshMidiLabel.setJustificationType(juce::Justification::centred);
-    refreshMidiLabel.setColour(juce::Label::textColourId, juce::Colour(0xff888888)); // Grigio come le altre
-    refreshMidiLabel.setFont(juce::FontOptions("Arial", 9.0f, juce::Font::bold));    // 9px come le altre
-    refreshMidiLabel.setMinimumHorizontalScale(1.0f); // Evita i puntini "..."
+    refreshMidiLabel.setColour(juce::Label::textColourId, juce::Colour(0xff888888)); 
+    refreshMidiLabel.setFont(juce::FontOptions("Arial", 9.0f, juce::Font::bold));   
+    refreshMidiLabel.setMinimumHorizontalScale(1.0f); 
 
     addAndMakeVisible(refreshMidiButton);
     addAndMakeVisible(refreshMidiLabel);
     audioProcessor.refreshMidiOutputs();
 
-    // Scale display (LED screen style - cyan to match turntable)
+    // Scale Display (LED screen style - cyan to match turntable)
     scaleDisplay.setText("Penta", juce::dontSendNotification);
     scaleDisplay.setJustificationType(juce::Justification::centred);
     scaleDisplay.setColour(juce::Label::backgroundColourId, juce::Colour(0xff0a0a0a));
@@ -633,10 +630,6 @@ SkaldEditor::SkaldEditor (SkaldProcessor& p)
     octaveLabel.setFont(juce::FontOptions("Arial", 9.0f, juce::Font::bold));
     addAndMakeVisible(octaveLabel);
 
-    // Load Viking logo for help/about screen
-    vikingFullImage = juce::ImageCache::getFromMemory(BinaryData::viking_full_png,
-                                                       BinaryData::viking_full_pngSize);
-
     // Load custom fonts (all legally licensed for distribution)
     // Cinzel Bold - SIL OFL 1.1
     auto headerFontData = juce::Typeface::createSystemTypefaceFor(BinaryData::header_ttf,
@@ -671,31 +664,50 @@ SkaldEditor::SkaldEditor (SkaldProcessor& p)
         wallpaperImage = scaledWallpaper;
     }
 
-    // Patch 49: Configurazione Label Versione
+    // Configurazione Label Versione
     versionLabel.setText ("v" + juce::String (JucePlugin_VersionString), juce::dontSendNotification);
-    versionLabel.setFont(juce::FontOptions(14.0f, juce::Font::bold)); // Leggermente più grande e grassetto
-    versionLabel.setColour(juce::Label::textColourId, juce::Colours::cyan.withAlpha(0.6f)); // Cyan semi-trasparente stile LED
-    versionLabel.setJustificationType(juce::Justification::centredRight); // Allineata a destra
-    addAndMakeVisible(versionLabel); // FONDAMENTALE: senza questo non appare mai
+    versionLabel.setFont(juce::FontOptions(14.0f, juce::Font::bold)); 
+    versionLabel.setColour(juce::Label::textColourId, juce::Colours::cyan.withAlpha(0.6f)); 
+    versionLabel.setJustificationType(juce::Justification::centredRight); 
+    addAndMakeVisible(versionLabel); 
 
-    // --- Titolo Sezione Algoritmica ---
+    // --- MIDI Learn Setup ---
+    addAndMakeVisible(learnButton);
+    learnButton.setButtonText("LRN");
+    learnButton.setLookAndFeel(&hardwareLookAndFeel);
+    learnButton.onClick = [this] {
+        if (midiMatrixPopup == nullptr) {
+            midiMatrixPopup = std::make_unique<MidiMatrixPopup>(audioProcessor, *this);
+            addAndMakeVisible(*midiMatrixPopup);
+            midiMatrixPopup->toFront(true);
+        }
+        else {
+            midiMatrixPopup.reset();
+        }
+        };
+
+    addAndMakeVisible(learnLabel);
+    learnLabel.setText("MIDI CFG", juce::dontSendNotification);
+    learnLabel.setJustificationType(juce::Justification::centred);
+    learnLabel.setFont(wonderworldFont.withHeight(12.0f));
+
+    // --- Algorithmic Section Title ---
     algoTitleLabel.setText("ALGORITHMIC GEN", juce::dontSendNotification);
     algoTitleLabel.setJustificationType(juce::Justification::centred);
-    // Usiamo il font Arthemis che hai già caricato per coerenza stilistica!
     algoTitleLabel.setFont(csArthemisFont.withHeight(18.0f));
     algoTitleLabel.setColour(juce::Label::textColourId, juce::Colour(0xff00d9ff)); // Cyan come i LED
     addAndMakeVisible(algoTitleLabel);
 
-    // --- Configurazione Selettore Anello (Patch 31) ---
+    // --- Ring Selector Configuration ---
     ringSelector.setEditableText(false);
     ringSelector.setJustificationType(juce::Justification::centred);
 
-    // --- Patch 6.4a: 8 anelli musicali disponibili (Ring 1-8, escluso 0-Scratch) ---
+    // --- 8 musical rings available (Ring 1-8, excluding 0-Scratch) ---
     for (int i = 1; i <= 8; ++i) {
         ringSelector.addItem("Ring " + juce::String(i), i);
     }
 
-    ringSelector.setSelectedId(1); // Default sul primo anello
+    ringSelector.setSelectedId(1); // Default on the first ring
     ringSelector.onChange = [this]() {
         selectedRingForAlgo = ringSelector.getSelectedId() - 1;
         };
@@ -704,8 +716,8 @@ SkaldEditor::SkaldEditor (SkaldProcessor& p)
     ringSelectorLabel.setText("TARGET RING", juce::dontSendNotification);
     addAndMakeVisible(ringSelectorLabel);
 
-    // --- Configurazione Sezione Algoritmica (Patch 29) ---
-        // 1. Slider Pulses & Steps (Base Euclidea)
+    // --- Algorithmic Section Configuration ---
+        // 1. Slider Pulses & Steps (Euclidean Base)
     pulsesSlider.setSliderStyle(juce::Slider::LinearHorizontal);
     pulsesSlider.setRange(1, 32, 1);
     pulsesSlider.setValue(audioProcessor.getLastPulses(), juce::dontSendNotification);
@@ -722,7 +734,7 @@ SkaldEditor::SkaldEditor (SkaldProcessor& p)
     stepsLabel.setText("STEPS", juce::dontSendNotification);
     addAndMakeVisible(stepsLabel);
 
-    // 2. Slider Depth & Shift (Logica Hyper-Euclidean Punto 4)
+    // 2. Slider Depth & Shift (Hyper-Euclidean Logic)
     depthSlider.setSliderStyle(juce::Slider::LinearHorizontal);
     depthSlider.setRange(1, 4, 1);
     depthSlider.setValue(audioProcessor.getLastDepth(), juce::dontSendNotification);
@@ -739,7 +751,7 @@ SkaldEditor::SkaldEditor (SkaldProcessor& p)
     shiftLabel.setText("SHIFT", juce::dontSendNotification);
     addAndMakeVisible(shiftLabel);
 
-    // 3. Pulsante Generate con Logica Completa
+    // 3. Generate Button with Complete Logic
     generateButton.setButtonText("GENERATE");
     generateButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff1a3a3a));
     generateButton.onClick = [this]()
@@ -1192,8 +1204,7 @@ void SkaldEditor::paint (juce::Graphics& g)
             g.fillEllipse(dotPos.x - 1, dotPos.y - 1, 2, 2);
         }
 
-        // Disegna il numero del canale MIDI sopra il punto
-        // Usiamo un font piccolo e leggibile
+        // Draw the MIDI channel number above the dot
         g.setColour(juce::Colours::black.withAlpha(0.8f));
         g.setFont(10.0f);
         g.drawText(juce::String(dots[i].midiChannel),
@@ -1205,7 +1216,7 @@ void SkaldEditor::paint (juce::Graphics& g)
         // Note label when selected
         if (selectedDotIndex == static_cast<int>(i))
         {
-            // --- HUD INFORMATIVO (Velocity / MIDI Channel) ---
+            // --- INFORMATIVE HUD (Velocity / MIDI Channel) ---
             // Lo disegniamo solo se stiamo trascinando con i tasti modificatori
             if (isDraggingDot && juce::ModifierKeys::getCurrentModifiers().isAnyModifierKeyDown())
             {
@@ -1214,13 +1225,13 @@ void SkaldEditor::paint (juce::Graphics& g)
                     statusText = "VELOCITY: " + juce::String(dots[i].velocity);
                 else if (juce::ModifierKeys::getCurrentModifiers().isAltDown())
                     statusText = "MIDI CH: " + juce::String(dots[i].midiChannel);
-                // --- Patch 6.4: Visualizzazione Gate Time nell'HUD ---
+                // --- Gate Time Display in HUD ---
                 else if (juce::ModifierKeys::getCurrentModifiers().isCtrlDown())
                     statusText = "GATE: " + juce::String(juce::roundToInt(dots[i].gateTime)) + " ms";
 
                 if (statusText.isNotEmpty())
                 {
-                    // Spostamento HUD: Area rettangolare posizionata per evitare sovrapposizioni
+                    // HUD Move: Rectangular area positioned to avoid overlaps
                     auto hudArea = juce::Rectangle<int>(getWidth() - 160, 115, 145, 28);
 
                     g.setColour(juce::Colours::black.withAlpha(0.7f));
@@ -1342,7 +1353,7 @@ void SkaldEditor::resized()
 {
     auto area = getLocalBounds();
 
-    // Sposta tutto verso il basso se siamo in Standalone per non coprire i menu MPC/Audio
+    // Move everything down if we are in Standalone so as not to cover the MP/Audio menus
     if (juce::JUCEApplication::isStandaloneApp())
         area.removeFromTop(45);
 
@@ -1360,10 +1371,19 @@ void SkaldEditor::resized()
         bpmLabel.setVisible(true);
         bpmSlider.setVisible(true);
 
-        // Abbassiamo il tasto Play di 10 pixel rispetto alla riga dei LED
-        auto playArea = topControls.removeFromLeft(60);
-        playStopButton.setBounds(playArea.getX(), playArea.getY() + 10, playArea.getWidth(), 30);
-        topControls.removeFromLeft(8);
+        // Transport area
+        auto transportArea = topControls.removeFromLeft(60);
+
+        // PLAY button
+        playStopButton.setBounds(transportArea.getX(), transportArea.getY() + 22, transportArea.getWidth(), 32);
+
+        // LEARN button
+        learnButton.setBounds(transportArea.getX(), transportArea.getY() + 59, transportArea.getWidth(), 22);
+
+        // Label under the button
+        learnLabel.setBounds(transportArea.getX(), transportArea.getY() + 82, transportArea.getWidth(), 12);
+
+        topControls.removeFromLeft(15); 
 
         bpmLabel.setBounds(topControls.removeFromLeft(45));
         topControls.removeFromLeft(4);
@@ -1372,7 +1392,7 @@ void SkaldEditor::resized()
     }
     else
     {
-        // Hide in VST/AU mode
+        // Hide in VST mode
         playStopButton.setVisible(false);
         bpmLabel.setVisible(false);
         bpmSlider.setVisible(false);
@@ -1464,29 +1484,24 @@ void SkaldEditor::resized()
     const int topControlsHeight = 100;  // Height of top controls area
     const int bottomControlsSpace = 56 + 12 + 25;  // toggle height + label height + margin
 
-    // --- Patch 52 (Fix E0020): Layout proporzionale con Sidebar ---
+    // --- Proportional layout with sidebar ---
     const int sidebarWidthRight = 220;
     const int layoutMargin = 25; // Definiamo qui il margine per evitare E0020
 
-    // Calcoliamo lo spazio orizzontale reale sottraendo la sidebar e i margini
     int availableWidth = getWidth() - sidebarWidthRight - (layoutMargin * 2);
     int availableHeight = getHeight() - topControlsHeight - bottomControlsSpace;
 
-    // Ingrandiamo il turntable: aumentiamo il moltiplicatore per occupare più spazio disponibile
-    // availableWidth e availableHeight sono già calcolati correttamente sottraendo sidebar e controlli
+    //Let's enlarge the turntable: let's increase the multiplier to occupy more available space
     int turntableSize = static_cast<int>(juce::jmin(availableWidth, availableHeight) * 1.05f);
-
-    // Centriamo orizzontalmente nell'area disponibile, ma aggiungiamo +25 pixel in verticale per abbassarlo
     int turntableX = layoutMargin + (availableWidth - turntableSize) / 2;
     int turntableY = topControlsHeight + (availableHeight - turntableSize) / 2 + 25;
 
     turntableArea = juce::Rectangle<float>((float)turntableX, (float)turntableY, (float)turntableSize, (float)turntableSize);
     turntableRadius = turntableSize / 2.0f * 0.95f;
 
-    // Patch 6.2 Spaziatura per 10 zone totali (1 Scratch + 8 Note + 1 Centro)
     const float ringSpacingConst = 0.095f;
 
-    // Sincronizzazione fondamentale per il mouseDown (centro del giradischi)
+    // Basic synchronization for mouseDown (center of turntable)
     turntableCenter = turntableArea.getCentre();
 
     // Position action buttons in bottom right
@@ -1497,13 +1512,12 @@ void SkaldEditor::resized()
     const int instructionTextHeight = 15;
 
     // Calculate action button Y position (align with toggles)
-    // Patch: Ricalcolo per 9 pulsanti (incluso Refresh e MID)
+    // Recalculation for 9 buttons (including Refresh and MID)
     int buttonStartX = getWidth() - margin - (buttonSize * 9 + buttonSpacing * 8);
     int buttonY = getHeight() - margin - buttonSize - buttonLabelHeight;
 
-    // Refresh MIDI (Patch: Area allargata per la label per evitare troncamenti)
+    // MIDI Refresh
     refreshMidiButton.setBounds(buttonStartX, buttonY, buttonSize, buttonSize);
-    // Usiamo una larghezza di 50 invece di 32 per far stare la scritta, centrandola
     refreshMidiLabel.setBounds(buttonStartX - 9, buttonY + buttonSize, 50, buttonLabelHeight);
     buttonStartX += buttonSize + buttonSpacing;
 
@@ -1527,7 +1541,7 @@ void SkaldEditor::resized()
     saveLabel.setBounds(buttonStartX, buttonY + buttonSize, buttonSize, buttonLabelHeight);
     buttonStartX += buttonSize + buttonSpacing;
 
-    // MID Export Button (Patch 15-B)
+    // MID Export Button
     exportMidiButton.setBounds(buttonStartX, buttonY, buttonSize, buttonSize);
     exportMidiLabel.setBounds(buttonStartX, buttonY + buttonSize, buttonSize, buttonLabelHeight);
     buttonStartX += buttonSize + buttonSpacing;
@@ -1562,13 +1576,10 @@ void SkaldEditor::resized()
     startStopToggle.setBounds(toggleX, toggleY, toggleWidth, 56);
     startStopLabel.setBounds(toggleX, toggleY + 56, toggleWidth, toggleLabelHeight);
 
-    // --- Patch 48: Sidebar Algoritmica Distanziata ---
+    // --- Spaced Algorithmic Sidebar ---
 
-        // Creiamo un'area a destra larga 220px
     auto sidebarArea = getLocalBounds().removeFromRight(220).reduced(20);
 
-    // IMPORTANTE: Scendiamo sotto la linea dei Knob (che finiscono a circa y=100)
-    // Iniziamo la sidebar a y=180 per lasciare spazio ai popup degli slider sopra
     sidebarArea.removeFromTop(160);
 
     int ctrlH = 25;
@@ -1603,15 +1614,43 @@ void SkaldEditor::resized()
     shiftSlider.setBounds(sidebarArea.removeFromTop(ctrlH));
     sidebarArea.removeFromTop(gap * 2);
 
-    // Pulsante Generate (bello evidente in fondo alla sidebar)
     generateButton.setBounds(sidebarArea.removeFromTop(45).reduced(10, 0));
 
-    // Posiziona nell'angolo in basso a destra con un po' di margine (20px dal bordo)
     versionLabel.setBounds(getWidth() - 120, getHeight() - 30, 100, 20);
+
+    // --- MIDI Matrix Popup Positioning ---
+    if (midiMatrixPopup != nullptr)
+    {
+        int popupW = 250;
+        int popupH = 480;
+
+        // Let's center it in the plugin window
+        midiMatrixPopup->setBounds((getWidth() - popupW) / 2,
+            (getHeight() - popupH) / 2,
+            popupW, popupH);
+    }
 }
 
 void SkaldEditor::mouseDown (const juce::MouseEvent& event)
 {
+    // 1. Specific management for MIDI Popup
+    if (midiMatrixPopup != nullptr)
+    {
+        auto localPos = event.getEventRelativeTo(midiMatrixPopup.get()).getPosition();
+
+        // If the click is INSIDE the popup, do nothing here (MidiMatrixPopup::mouseDown takes care of that))
+        if (midiMatrixPopup->getLocalBounds().contains(localPos))
+        {
+            return;
+        }
+        else
+        {
+            // If the Click is OUTSIDE the popup: we close it
+            midiMatrixPopup.reset();
+            repaint();
+            return;
+        }
+    }
     auto clickPos = event.position;
 
     // Check if clicking on outer ring for scratching or stopping
@@ -1651,11 +1690,11 @@ void SkaldEditor::mouseDown (const juce::MouseEvent& event)
     // Check if we clicked on an existing dot
     selectedDotIndex = findDotAtPoint(clickPos);
 
-    // Se abbiamo cliccato un punto, salviamo il suo canale MIDI iniziale per il trascinamento con ALT
+    // If we clicked a point, we save its initial MIDI channel for dragging with ALT
     // Check if we clicked on an existing dot
     selectedDotIndex = findDotAtPoint(clickPos);
 
-    // Patch 50.1: Protezione accesso sicuro ai dots
+    // Secure access protection to dots
     auto& dots = audioProcessor.getDots();
     if (selectedDotIndex >= 0 && selectedDotIndex < static_cast<int>(dots.size()))
     {
@@ -1663,12 +1702,12 @@ void SkaldEditor::mouseDown (const juce::MouseEvent& event)
         initialVelocityOnDrag = dots[selectedDotIndex].velocity;
         initialGateOnDrag = dots[selectedDotIndex].gateTime;
 
-        // Patch: Memorizza la Y iniziale per il calcolo del delta nel Drag
+        // Stores the initial Y for delta calculation in Drag
         initialMouseYOnDrag = event.position.y;
     }
     else
     {
-        selectedDotIndex = -1; // Reset di sicurezza se l'indice è sporco
+        selectedDotIndex = -1; // Safety reset if the index finger is dirty
     }
     // Double-click handling
     if (event.getNumberOfClicks() == 2)
@@ -1692,7 +1731,7 @@ void SkaldEditor::mouseDown (const juce::MouseEvent& event)
             if (distanceFromCenter > innerRadius * 0.95f || distanceFromCenter < innerRadius * 0.05f)
                 return; // Outside playable area
 
-            // --- Patch 6.3: Rilevazione 9 zone (0=Scratch, 1-8=Note) ---
+            // --- 9-zone detection (0=Scratch, 1-8=Note) ---
             int ringIndex = -1;
             const float currentRingSpacing = 0.095f;
 
@@ -1703,7 +1742,7 @@ void SkaldEditor::mouseDown (const juce::MouseEvent& event)
 
                 if (distanceFromCenter <= ringOuterRadius && distanceFromCenter >= ringInnerRadius)
                 {
-                    // Anelli 1-8 tutti disponibili, incluso quello centrale, protezione solo per lo scratch
+                    // Rings 1-8 all available, including the center one, scratch protection only
                     if (ring == 0) return;
 
                     ringIndex = ring;
@@ -1746,7 +1785,7 @@ void SkaldEditor::mouseDown (const juce::MouseEvent& event)
         // Start dragging existing dot
         isDraggingDot = true;
 
-        // Patch 50.2: Protezione trigger anteprima
+        // Preview trigger protection
         auto& currentDots = audioProcessor.getDots();
         if (selectedDotIndex >= 0 && selectedDotIndex < static_cast<int>(currentDots.size()))
         {
@@ -1846,7 +1885,7 @@ void SkaldEditor::mouseDrag (const juce::MouseEvent& event)
     {
         auto& dots = audioProcessor.getDots();
 
-        // Sicurezza: verifichiamo che l'indice sia valido prima di procedere
+        // Security: We verify that the index is valid before proceeding.
         if (selectedDotIndex < 0 || selectedDotIndex >= (int)dots.size()) return;
 
         // --- 1. SHIFT = Modifica VELOCITY ---
@@ -1863,7 +1902,7 @@ void SkaldEditor::mouseDrag (const juce::MouseEvent& event)
             return;
         }
 
-        // --- 2a. ALT = Modifica CANALE MIDI ---
+        // --- 2a. ALT = Edit MIDI CHANNEL ---
         if (event.mods.isAltDown())
         {
             int dragDelta = -event.getDistanceFromDragStartY() / 15;
@@ -1872,17 +1911,17 @@ void SkaldEditor::mouseDrag (const juce::MouseEvent& event)
             if (newChannel != dots[selectedDotIndex].midiChannel)
             {
                 dots[selectedDotIndex].midiChannel = newChannel;
-                // Patch: Generazione colore dinamica basata sul canale (1-16) per feedback immediato
+                // Dynamic channel-based color generation (1-16) for immediate feedback
                 dots[selectedDotIndex].color = juce::Colour::fromHSV((newChannel - 1) / 16.0f, 0.7f, 0.9f, 1.0f);
                 repaint();
             }
             return;
         }
 
-        // --- 2b. CTRL = Modifica GATE TIME (Nuova Logica ms) ---
+        // --- 2b. CTRL = Change GATE TIME (New ms Logic) ---
         if (event.mods.isCtrlDown())
         {
-            // Ogni pixel = 5ms di variazione per un controllo fluido
+            // Each pixel = 5ms of change for smooth control
             int dragDelta = -event.getDistanceFromDragStartY() * 5;
             float newGate = juce::jlimit(10.0f, 2000.0f, initialGateOnDrag + (float)dragDelta);
 
@@ -1894,16 +1933,16 @@ void SkaldEditor::mouseDrag (const juce::MouseEvent& event)
             return;
         }
 
-        // --- 3. TRASCINAMENTO NORMALE (Angolo e Anello) ---
-        // Calcoliamo la distanza dal centro per determinare l'anello (Ring)
+        // --- 3. NORMAL DRAG (Corner and Ring) ---
+        // Let's calculate the distance from the center to determine the ring (Ring)
         auto delta = event.position - turntableCenter;
         float distanceFromCenter = delta.getDistanceFromOrigin();
         float innerRadius = turntableRadius * 0.90f;
 
-        // Aggiorna l'angolo (posizione circolare)
+        // Update angle (circular position)
         dots[selectedDotIndex].angle = angleFromPoint(event.position);
 
-        // Calcolo dinamico dell'anello
+        // Dynamic calculation of the ring
         int numRings = audioProcessor.getNumRings();
         float ringSpacing = numRings > 0 ? 0.80f / numRings : 0.15f;
         int newRingIndex = dots[selectedDotIndex].ringIndex;
@@ -2009,7 +2048,6 @@ int SkaldEditor::findDotAtPoint(juce::Point<float> point)
 
 float SkaldEditor::getRingSpacing() const
 {
-    // Patch: Utilizziamo lo spacing costante 0.095f per coerenza con il layout e il mouse detection
     return 0.095f;
 }
 
@@ -2045,7 +2083,7 @@ float SkaldEditor::getSwingOffset(int beatCount, float swingAmount) const
     }
     else
     {
-        // Swung beat - offset proportional to swing amount (more dramatic)
+        // Swing beat - offset proportional to swing amount (more dramatic)
         // Swing at 50% = 0° offset (straight/no swing)
         // Swing at 66% = ~22.5° offset (triplet feel)
         // Swing at 100% = 45° offset (full 16th note delay - dramatic!)
@@ -2058,3 +2096,137 @@ float SkaldEditor::getSwingOffset(int beatCount, float swingAmount) const
         return delayRatio * 45.0f;
     }
 }
+
+SkaldEditor::MidiMatrixPopup::MidiMatrixPopup(SkaldProcessor& p, SkaldEditor& e)
+    : processor(p), editor(e)
+{
+    setSize(250, 650); 
+    startTimer(100);   
+}
+
+void SkaldEditor::MidiMatrixPopup::paint(juce::Graphics& g)
+{
+    g.fillAll(juce::Colours::black.withAlpha(0.9f));
+    g.setColour(juce::Colours::orange);
+    g.drawRect(getLocalBounds(), 2);
+
+    g.setFont(juce::Font(juce::Font::getDefaultSansSerifFontName(), 18.0f, juce::Font::bold));
+    g.drawText("MIDI ASSIGNMENTS", 10, 10, getWidth() - 20, 30, juce::Justification::centred);
+
+    int y = 50;
+    const int rowH = 25;
+
+    // Elenco parametri da mappare
+    juce::StringArray params = {
+        "tempo", "prob", "swing", "vel", "gate", "scratch",  // Main Controls
+        "pulses", "steps", "h_depth", "shift",               // Algorithmic Section
+        "div", "oct", "key", "scale",                        // Selectors
+        "motor", "rev", "play", "speed"                      // Toggles
+    };
+
+    // Start the parameter drawing cycle
+    for (int i = 0; i < params.size(); ++i)
+    {
+        juce::String pID = params[i];
+        int rowY = 50 + (i * 30); 
+        const int rowH = 25;
+
+        // 1. Draw the Parameter name
+        g.setColour(juce::Colours::white);
+        g.setFont(juce::Font(juce::Font::getDefaultSansSerifFontName(), 14.0f, juce::Font::plain));
+        g.drawText(pID.toUpperCase(), 15, rowY, 100, rowH, juce::Justification::left);
+
+        // 2. Calculate the Mapping status
+        juce::String mappingText = "---";
+        bool isLearningThis = (processor.isMidiLearning && processor.lastParamToLearn == pID);
+
+        if (processor.midiMappings.count(pID))
+            mappingText = "CC " + juce::String(processor.midiMappings[pID]);
+
+        // 3. Draws the CC value or the "LISTENING" state
+        if (isLearningThis)
+        {
+            g.setColour(juce::Colours::red);
+            mappingText = "LISTENING...";
+        }
+        else
+        {
+            g.setColour(juce::Colours::grey);
+        }
+        g.drawText(mappingText, 110, rowY, 80, rowH, juce::Justification::left);
+
+        // 4. Draw the "LEARN" button (orange rectangle on the right)
+        g.setColour(isLearningThis ? juce::Colours::red : juce::Colour(0xffff6b35));
+        g.fillRoundedRectangle(185, rowY + 2, 55, rowH - 4, 4.0f);
+
+        g.setColour(juce::Colours::black);
+        g.setFont(juce::Font(juce::Font::getDefaultSansSerifFontName(), 10.0f, juce::Font::bold));
+        // If it is learning THIS parameter, write STOP, otherwise LEARN
+        g.drawText(isLearningThis ? "STOP" : "LEARN", 185, rowY, 55, rowH, juce::Justification::centred);
+    }
+    // Draw MIDI RESET button at the bottom
+    int resetY = 610; 
+    g.setColour(juce::Colours::red.withAlpha(0.7f));
+    g.fillRoundedRectangle(15, resetY, getWidth() - 30, 30, 4.0f);
+
+    g.setColour(juce::Colours::white);
+    g.setFont(juce::Font(14.0f, juce::Font::bold));
+    g.drawText("RESET ALL MIDI ASSIGNMENTS", 15, resetY, getWidth() - 30, 30, juce::Justification::centred);
+}
+
+void SkaldEditor::MidiMatrixPopup::mouseDown(const juce::MouseEvent& event)
+{
+    auto pos = event.getPosition();
+
+    // 1. RESET button click control (Absolute priority)
+    if (pos.getY() >= 610) 
+    {
+        processor.clearAllMidiMappings();
+        repaint();
+        return; // EXIT: skips processing the parameter list below
+    }
+
+    // 2. Parameter list definition (identical to paint)
+    juce::StringArray params = {
+        "tempo", "prob", "swing", "vel", "gate", "scratch",
+        "pulses", "steps", "h_depth", "shift",
+        "div", "oct", "key", "scale",
+        "motor", "rev", "play", "speed"
+    };
+
+    const int yStart = 50;
+    const int rowSpacing = 30;
+    int clickedRow = (pos.getY() - yStart) / rowSpacing;
+
+    // 3. Click control on the list
+    if (clickedRow >= 0 && clickedRow < params.size())
+    {
+        if (pos.getX() >= 185) // Area del tasto LEARN
+        {
+            juce::String pID = params[clickedRow];
+
+            // RIGHT CLICK: Remove single parameter mapping
+            if (event.mods.isRightButtonDown())
+            {
+                processor.clearMidiMapping(pID);
+            }
+            // LEFT BUTTON: Standard LEARN logic
+            else
+            {
+                if (processor.isMidiLearning && processor.lastParamToLearn == pID)
+                {
+                    processor.isMidiLearning = false;
+                    processor.lastParamToLearn = "";
+                }
+                else
+                {
+                    processor.lastParamToLearn = pID;
+                    processor.isMidiLearning = true;
+                }
+            }
+            repaint();
+        }
+    }
+}
+
+void SkaldEditor::MidiMatrixPopup::timerCallback() { repaint(); }
