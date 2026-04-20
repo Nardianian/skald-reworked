@@ -1,5 +1,6 @@
+
 cmake_minimum_required(VERSION 3.15)
-project(Skald VERSION 1.1.6)
+project(Skald-Reworked VERSION 1.2.2)
 
 # Add JUCE as a subdirectory
 add_subdirectory(../JUCE ${CMAKE_CURRENT_BINARY_DIR}/JUCE)
@@ -14,8 +15,6 @@ include_directories("C:/Program Files/JACK2/include")
 # Create binary data from images
 juce_add_binary_data(BinaryData
     SOURCES
-        images/viking_full.png
-        images/viking_head.png
         images/switch_toggle.png
         images/knob_simplegray.png
         images/wallpaper.jpg
@@ -31,7 +30,7 @@ juce_add_plugin(Skald
     PLUGIN_CODE Skld
     VERSION ${PROJECT_VERSION}
     FORMATS VST3 VST AAX LV2 Standalone
-    PRODUCT_NAME "Skald"
+    PRODUCT_NAME "Skald-Reworked"
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT TRUE
@@ -41,9 +40,9 @@ juce_add_plugin(Skald
     VST3_CATEGORIES "Instrument" "Generator"
     VST2_CATEGORY kPlugCategSynth
     AAX_EPlugInCategory_SWGenerators 
-    BUNDLE_ID "https://github.com/josephvolmer/skald"
-    LV2URI https://github.com/josephvolmer/skald
-    AAX_IDENTIFIER com.josephvolmer.skald
+    BUNDLE_ID "com.Nardianian.skald-reworked"
+    LV2URI https://github.com/Nardianian/skald-reworked
+    AAX_IDENTIFIER com.Nardianian.skald
     PLUGIN_MANUFACTURER_EMAIL "support@beowulfaudio.com"
 )
 
@@ -55,19 +54,24 @@ target_sources(Skald PRIVATE
     Source/PluginEditor.h
     Source/EuclideanSet.cpp
     Source/EuclideanSet.h
+    Source/RtMidi.cpp
 )
 
 # Compiler definitions
 target_compile_definitions(Skald PUBLIC
+    _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS
+    __WINDOWS_UWP__=1
+    __WINDOWS_MM__=1
+    JUCE_USE_WINRT_MIDI=1
+    JUCE_FORCE_WINRT_MIDI=0
+    JUCE_USE_WINDOWS_MIDI_SERVICES=0
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_ASIO=1
     JUCE_JACK=1
-    JUCE_USE_WINRT_MIDI=1
-    JUCE_USE_WINDOWS_MIDI_SERVICES=0
     JUCE_DIRECT2D=0
-    JUCE_FORCE_WINRT_MIDI=0
     JUCE_STRICT_REFCOUNTEDPOINTER=1
+    JUCE_WIN_PER_MONITOR_DPI_AWARE=1
     JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
@@ -92,4 +96,4 @@ target_link_libraries(Skald PRIVATE
 
 # C++ standard
 target_compile_features(Skald PRIVATE cxx_std_17)
-
+				
