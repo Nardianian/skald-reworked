@@ -1,13 +1,11 @@
-#include <objbase.h>          // Per CoInitializeEx
+#include <objbase.h>          // Required For CoInitializeEx
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-
-// Header JUCE per i dispositivi audio/midi
 #include <juce_audio_devices/juce_audio_devices.h>
 
 #ifdef JUCE_WINDOWS
-#include <wrl/client.h>     // Per ComPtr (se usato)
-#include <roapi.h>          // Per interfacce WinRT
+#include <wrl/client.h>     //For ComPtr (if used)
+#include <roapi.h>          // For WinRT interfaces
 #endif
 
 //==============================================================================
@@ -16,15 +14,17 @@ SkaldProcessor::SkaldProcessor()
         .withOutput("Output", juce::AudioChannelSet::stereo(), true)
     )
 {
-    // Forza l'inizializzazione COM Multi-Threaded per l'intero processo.
-    // Questo è quello che intendevi con "inizializzazione nel main".
-    // COINIT_MULTITHREADED è richiesto specificamente da WinRT MIDI.
+    isMidiLearning = false;
+    lastParamToLearn = ""; // It must be empty at the beginning!
+
+    // Force Multi-Threaded COM initialization for the entire process.
+    // COINIT_MULTITHREADED is specifically required by WinRT MIDI.
     static HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 
-    // Un piccolo respiro per permettere ai driver di rispondere
+    // A little breather to allow drivers to respond
     juce::Thread::sleep(150);
     // ---------------------------------------------
-    // Inizializzazione parametri algoritmici (Patch 36)
+    // Initialization of algorithmic parameters 
     lastPulses = 4;
     lastSteps = 16;
     lastDepth = 1;
@@ -33,29 +33,29 @@ SkaldProcessor::SkaldProcessor()
     // Initialize scale
     updateScaleNotes();
 
-    // --- Patch Standalone Fix: Inizializzazione Device Manager ---
+    // --- Standalone: ​​Initializing Device Manager ---
     if (juce::JUCEApplication::isStandaloneApp())
     {
-        // Forza l'inizializzazione per i permessi MIDI su Windows/macOS
+        // Force initialization for MIDI permissions on Windows
         deviceManager.initialise(0, 0, nullptr, true, {}, nullptr);
         deviceManager.addMidiInputDeviceCallback({}, nullptr);
     }
 
-    // --- Patch Standalone Fix: Inizializzazione Sequenziale ---
+    // --- Standalone: ​​Sequential Initialization ---
     if (juce::JUCEApplication::isStandaloneApp())
     {
-        // Diamo un piccolo respiro (50ms) per permettere ai thread COM/WinRT 
-        // inizializzati da deviceManager.initialise di stabilizzarsi.
+        // Gives a short break (50ms) to allow COM/WinRT threads 
+        // initialized by deviceManager.initialise to settle down.
         juce::Thread::sleep(50);
     }
 
-    // Eseguiamo la prima scansione
+    // Perform the first scan
     refreshMidiOutputs();
 
-    // Se non troviamo nulla (solo 0 o 1 device), WinRT è probabilmente ancora in fase di enumerazione
+    // If it doesn't find anything (only 0 to 1 devices), WinRT is probably still enumerating
     if (availableMidiOutputs.size() <= 1)
     {
-        // Aumentiamo il tempo di attesa a 500ms: WinRT su Windows 11 può essere molto lento al boot
+        // Increase wait time to 500ms: WinRT on Windows 11 can be very slow to boot.
         juce::Thread::sleep(500);
         refreshMidiOutputs();
     }
@@ -63,7 +63,7 @@ SkaldProcessor::SkaldProcessor()
     if (juce::JUCEApplication::isStandaloneApp() && !availableMidiOutputs.isEmpty())
     {
         auto setup = deviceManager.getAudioDeviceSetup();
-        // Nota: in WinRT l'identifier è più affidabile del nome per il confronto
+        // Note: In WinRT, the identifier is more reliable than the name for comparison.
         juce::String lastMidiPort = setup.outputDeviceName;
 
         int targetIndex = 0;
@@ -84,20 +84,30 @@ SkaldProcessor::SkaldProcessor()
     addDot(90.0f, 2, juce::Colour(0xffff6b35));     // 3rd note
     addDot(180.0f, 4, juce::Colour(0xffff6b35));    // 5th note
     addDot(270.0f, 2, juce::Colour(0xffff6b35));    // 3rd note
+
+    // Initialize RtMidi (Multi-client) for Standalone
+    if (juce::JUCEApplication::isStandaloneApp())
+    {
+        setupRtMidi();
+    }
 }
 
 SkaldProcessor::~SkaldProcessor()
 {
-    // 1. Ferma il thread standalone se attivo
+    // 1. Reset RtMidi instances (stops callback threads before cleaning up the rest)
+    rtMidiInUWP.reset();
+    rtMidiInLegacy.reset();
+
+    // 2. Stop standalone thread if active
     if (standaloneMidiOut.output != nullptr)
     {
         standaloneMidiOut.output->stopBackgroundThread();
         standaloneMidiOut.output.reset();
     }
-    // 2. Svuota la lista dei device (forza il rilascio degli oggetti WinRT)
+    // 3. Clear the device list (force release of WinRT objects)
     availableMidiOutputs.clear();
 
-    // 3. Opzionale: se usi il deviceManager di JUCE
+    // 4. Optional: If you use JUCE's deviceManager
     deviceManager.removeMidiInputDeviceCallback({}, nullptr);
 }
 
@@ -159,7 +169,7 @@ void SkaldProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     this->sampleRate = sampleRate;
     triggeredThisRotation.resize(dots.size(), false);
 
-    // Refresh MIDI in modalità Standalone
+    // Refresh MIDI in Standalone mode
     if (juce::JUCEApplication::isStandaloneApp())
     {
         if (standaloneMidiOut.output == nullptr)
@@ -188,6 +198,36 @@ void SkaldProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 {
     buffer.clear();
 
+        // --- MIDI LEARN LISTENER ---
+    for (const auto metadata : midiMessages)
+    {
+        auto msg = metadata.getMessage();
+        if (msg.isController())
+        {
+            int cc = msg.getControllerNumber();
+            int val = msg.getControllerValue();
+
+            if (isMidiLearning && lastParamToLearn.isNotEmpty())
+            {
+                // Assign the received CC to the selected parameter
+                midiMappings[lastParamToLearn] = cc;
+
+                // FUNDAMENTAL RESET: Stops learning and clears ID
+                isMidiLearning = false;
+                lastParamToLearn = "";
+            }
+            else
+            {
+                // Normal mode: Check if the CC is already mapped
+                for (auto const& [paramID, mappedCC] : midiMappings)
+                {
+                    if (cc == mappedCC)
+                        applyMidiControl(paramID, val);
+                }
+            }
+        }
+    }
+
     // Process active note-offs first (notes that should end in this buffer)
     std::vector<ActiveNote> notesToKeep;
     for (const auto& note : activeNotes)
@@ -199,7 +239,7 @@ void SkaldProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             // Note-off occurs in this buffer
             juce::MidiMessage noteOff = juce::MidiMessage::noteOff(note.channel, note.midiNote, (juce::uint8)0);
             midiMessages.addEvent(noteOff, static_cast<int>(noteOffInBuffer));
-            // Invio manuale standalone per Note Off
+            // Standalone: Manual Send for Note Off
             if (standaloneMidiOut.output != nullptr)
                 standaloneMidiOut.output->sendMessageNow(noteOff);
         }
@@ -217,11 +257,11 @@ void SkaldProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         juce::ScopedLock lock(previewNotesLock);
         for (const auto& previewNote : previewNotesToSend)
         {
-            // Usiamo il valore trasportato nel campo timeStamp come velocity
+            // Use the value transported in the timeStamp field as velocity
             int pVel = juce::jlimit(1, 127, previewNote.timeStamp);
             juce::MidiMessage noteOn = juce::MidiMessage::noteOn(1, previewNote.midiNote, (juce::uint8)pVel);
             midiMessages.addEvent(noteOn, 0);
-            // Invio manuale standalone per Preview
+            // Manual submission in standalone mode for Preview
             if (standaloneMidiOut.output != nullptr)
                 standaloneMidiOut.output->sendMessageNow(noteOn);
 
@@ -323,7 +363,8 @@ void SkaldProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         // One full rotation per 2 bars (8 beats) at normal speed
         // Apply reverse if enabled
         double beatsPerSecond = currentBPM / 60.0;
-        double effectiveSpeed = isReversed ? -speed : speed;
+        float currentMidiSpeed = midiSpeed.load(); // Reads the atomic value from RtMidi
+        double effectiveSpeed = isReversed ? -currentMidiSpeed : currentMidiSpeed;
         effectiveSpeed *= currentSpeedMultiplier;  // Apply motor ramp
         double rotationsPerSecond = (beatsPerSecond / 8.0) * effectiveSpeed;
         double degreesPerSample = (rotationsPerSecond * 360.0) / sampleRate;
@@ -401,7 +442,8 @@ void SkaldProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             {
                 // Apply probability - check if this note should trigger
                 float probRoll = random.nextFloat() * 100.0f;
-                bool passedProbability = probRoll <= probability;
+                float currentMidiProb = midiProbability.load(); // Reads the atomic value from RtMidi
+                bool passedProbability = probRoll <= currentMidiProb;
 
                 if (!passedProbability)
                 {
@@ -496,23 +538,22 @@ void SkaldProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                     finalVelocity = juce::jlimit(1, 127, finalVelocity);
                 }
 
-                // --- Patch: Gestione MIDI e Gate individuale ---
+                // --- Individual MIDI and Gate Management ---
                 juce::MidiMessage noteOn = juce::MidiMessage::noteOn(dots[i].midiChannel, midiNote, (juce::uint8)finalVelocity);
                 midiMessages.addEvent(noteOn, triggerSample);
 
-                // Standalone: Invia immediatamente il Note ON
+                // Standalone: ​​Send Note ON immediately
                 if (standaloneMidiOut.output != nullptr)
                     standaloneMidiOut.output->sendMessageNow(noteOn);
 
-                // --- Patch: Conversione corretta Gate Time (da ms a secondi) ---
+                // --- Correct Gate Time Conversion (ms to seconds) ---
                 double individualGateSeconds = static_cast<double>(dots[i].gateTime) / 1000.0;
 
                 juce::int64 durationSamples = static_cast<juce::int64>(sampleRate * individualGateSeconds);
                 juce::int64 absoluteNoteOffSample = totalSamplesProcessed + triggerSample + durationSamples;
 
-                // Aggiungiamo alla lista delle note attive per il Note Off futuro
+                // Adds to the list of active notes for future Note Off
                 activeNotes.push_back({ midiNote, dots[i].midiChannel, absoluteNoteOffSample });
-                // --- Fine Patch ---
 
                 triggeredThisRotation[i] = true;
 
@@ -573,9 +614,9 @@ void SkaldProcessor::getStateInformation(juce::MemoryBlock& destData)
         stream.writeInt(dot.ringIndex);
         stream.writeInt(dot.color.getARGB());
         stream.writeBool(dot.active);
-        stream.writeInt(dot.velocity);     // Patch 17
-        stream.writeInt(dot.midiChannel);  // Patch 17
-        stream.writeFloat(dot.gateTime);   // Salvataggio Gate individuale
+        stream.writeInt(dot.velocity);     
+        stream.writeInt(dot.midiChannel);   
+        stream.writeFloat(dot.gateTime);   // Individual Gate Rescue
     }
 
     stream.writeInt(globalVelocity);
@@ -584,11 +625,18 @@ void SkaldProcessor::getStateInformation(juce::MemoryBlock& destData)
     stream.writeFloat(probability);
     stream.writeFloat(velocityVariation);
     stream.writeFloat(swing);
-    // --- Nuovi parametri Algoritmici (Patch 33) ---
+    // --- Algorithmic Parameters ---
     stream.writeInt(lastPulses);
     stream.writeInt(lastSteps);
     stream.writeInt(lastDepth);
     stream.writeInt(lastShift);
+    // Saving MIDI Maps
+    stream.writeInt((int)midiMappings.size());
+    for (auto const& [paramID, cc] : midiMappings)
+    {
+        stream.writeString(paramID);
+        stream.writeInt(cc);
+    }
 }
 
 void SkaldProcessor::setStateInformation(const void* data, int sizeInBytes)
@@ -610,15 +658,16 @@ void SkaldProcessor::setStateInformation(const void* data, int sizeInBytes)
         dot.ringIndex = stream.readInt();
         dot.color = juce::Colour(stream.readInt());
         dot.active = stream.readBool();
-        dot.velocity = stream.readInt();    // Patch 17
-        dot.midiChannel = stream.readInt(); // Patch 17
-        dot.gateTime = stream.readFloat();    // Ripristino Gate individuale
+        dot.velocity = stream.readInt();       
+        dot.midiChannel = stream.readInt();    
+        dot.gateTime = stream.readFloat();    // Individual Gate Reset
         dots.push_back(dot);
     }
 
-    triggeredThisRotation.resize(dots.size(), false);
+    // Synchronize the trigger tracker with the number of dots loaded
+    triggeredThisRotation.assign(dots.size(), false);
 
-    // Safe Read: Verifica che lo stream non sia esaurito prima di leggere i parametri globali
+    // Safe Read: Make sure the stream is not exhausted before reading the global parameters.
     if (!stream.isExhausted()) globalVelocity = stream.readInt();
     if (!stream.isExhausted()) gateTimeMs = stream.readFloat();
     if (!stream.isExhausted()) isReversed = stream.readBool();
@@ -626,11 +675,30 @@ void SkaldProcessor::setStateInformation(const void* data, int sizeInBytes)
     if (!stream.isExhausted()) velocityVariation = stream.readFloat();
     if (!stream.isExhausted()) swing = stream.readFloat();
 
-    // --- Ripristino parametri Algoritmici (Patch 34) ---
+    // --- Resetting Algorithmic Parameters ---
     if (!stream.isExhausted()) lastPulses = stream.readInt();
     if (!stream.isExhausted()) lastSteps = stream.readInt();
     if (!stream.isExhausted()) lastDepth = stream.readInt();
     if (!stream.isExhausted()) lastShift = stream.readInt();
+
+        // MIDI Map Recovery (Safe Read with Integrity Check)
+    if (stream.getNumBytesRemaining() >= sizeof(int))
+    {
+        int numMappings = stream.readInt();
+
+        // Safety limit: Do not load more than 100 mappings to avoid buffer overflows
+        if (numMappings > 0 && numMappings < 100)
+        {
+            midiMappings.clear();
+            for (int i = 0; i < numMappings; ++i)
+            {
+                if (stream.isExhausted()) break;
+                juce::String pID = stream.readString();
+                int cc = stream.readInt();
+                midiMappings[pID] = cc;
+            }
+        }
+    }
 }
 
 //==============================================================================
@@ -757,25 +825,25 @@ std::vector<SkaldProcessor::TriggeredDotInfo> SkaldProcessor::getRecentlyTrigger
     return recentlyTriggeredDots;
 }
 
-// --- Patch 20: Generatore HyperEuclidean ---
+// --- HyperEuclidean Generator ---
 void SkaldProcessor::generateHyperPattern(int ringIndex, int pulses, int steps, int depth, int rotation)
 {
-    // Patch 6.1: Limite a 7 anelli (0 = Scratch, 1-6 = Dots)
+    // Limit 7 rings (0 = Scratch, 1-6 = Dots)
     if (ringIndex < 1 || ringIndex > 6)
         return;
 
-    // Aggiorna la memoria per il salvataggio (Patch 37)
+    // Update memory for saving
     lastPulses = pulses;
     lastSteps = steps;
     lastDepth = depth;
     lastShift = rotation;
 
-    // 1. Istanza con logica Hyper (depth > 1 crea sottostrutture ritmiche jazz-rock)
+    // 1. Instance with HyperEuclidean logic (depth > 1 creates jazz-rock or broken rhythmic substructures)
     HyperEuclidean generator(pulses, steps, depth);
     auto pattern = generator.generateSequence();
     auto vels = generator.velocities;
 
-    // 2. Pulizia del ring specifico
+    // 2. Cleaning of the specific ring
     dots.erase(std::remove_if(dots.begin(), dots.end(),
         [ringIndex](const TurntableDot& d) { return d.ringIndex == ringIndex; }),
         dots.end());
@@ -783,7 +851,7 @@ void SkaldProcessor::generateHyperPattern(int ringIndex, int pulses, int steps, 
     if (steps <= 0) return;
     float angleStep = 360.0f / static_cast<float>(steps);
 
-    // 3. Generazione con IOI Velocity (colpi distanti = accenti forti, colpi vicini = ghost notes)
+    // 3. Generation with IOI Velocity (distant strokes = strong accents, close strokes = ghost notes)
     for (int i = 0; i < (int)pattern.size(); ++i)
     {
         if (pattern[i] == 1)
@@ -791,12 +859,12 @@ void SkaldProcessor::generateHyperPattern(int ringIndex, int pulses, int steps, 
             TurntableDot newDot;
             newDot.ringIndex = ringIndex;
 
-            // Rotazione per sincopi e spostamenti ritmici
+            // Rotation for syncopations and rhythmic shifts
             float finalAngle = std::fmod((i * angleStep) + (rotation * angleStep), 360.0f);
             newDot.angle = finalAngle;
 
-            // IOI Velocity: la logica nel tuo .cpp assegna velocity in base allo spazio.
-            // Se vels[i] è 0, assegniamo un valore di sicurezza
+            // IOI Velocity: Logic in your .cpp assigns velocity based on space.
+            // If vels[i] is 0, we assign a safety value
             newDot.velocity = (vels[i] > 0) ? vels[i] : 80;
 
             newDot.active = true;
@@ -813,7 +881,7 @@ void SkaldProcessor::refreshMidiOutputs()
 {
     availableMidiOutputs.clear();
 
-    // Con WinMM (WinRT=0 nel CMake), questa chiamata è immediata e vede tutto.
+    // With WinMM (WinRT=0 in CMake), this call is immediate and sees everything.
     auto devices = juce::MidiOutput::getAvailableDevices();
 
     if (devices.isEmpty()) {
@@ -824,16 +892,16 @@ void SkaldProcessor::refreshMidiOutputs()
 
     for (auto& d : devices)
     {
-        // Questo DBG ti dirà il nome e l'ID. 
-        // Se l'ID inizia con {....} o ha un formato strano, è WinRT/WMS.
-        // Se l'ID è un numero o un nome semplice, è WinMM.
+        // This DBG will tell you the name and ID 
+        // If the ID starts with {....} or has a strange format, it's WinRT/WMS
+        // If the ID is a number or a simple name, it's WinMM.
         DBG("Device: " << d.name << " | ID: " << d.identifier);
         availableMidiOutputs.add(d);
     }
 
     DBG("Total devices found: " << availableMidiOutputs.size());
 
-    // Gestione persistenza standalone
+    // Standalone persistence management
     if (juce::JUCEApplication::isStandaloneApp() && standaloneMidiOut.output != nullptr)
     {
         auto currentInfo = standaloneMidiOut.output->getDeviceInfo();
@@ -857,14 +925,14 @@ void SkaldProcessor::changeMidiPort(int index)
 
     if (index >= 0 && index < availableMidiOutputs.size())
     {
-        // Chiude la porta precedente in modo sicuro
+        // Closes the previous door securely
         if (standaloneMidiOut.output != nullptr)
         {
             standaloneMidiOut.output->stopBackgroundThread();
             standaloneMidiOut.output = nullptr;
         }
 
-        // Tenta l'apertura del nuovo device tramite identificatore univoco
+        // Attempt to open the new device using a unique identifier
         standaloneMidiOut.output = juce::MidiOutput::openDevice(availableMidiOutputs[index].identifier);
 
         if (standaloneMidiOut.output != nullptr)
@@ -872,7 +940,7 @@ void SkaldProcessor::changeMidiPort(int index)
             standaloneMidiOut.output->startBackgroundThread();
             standaloneMidiOut.selectedPortIndex = index;
 
-            // Aggiorna il DeviceManager per mantenere la persistenza
+            // Update DeviceManager to maintain persistence
             deviceManager.setDefaultMidiOutputDevice(availableMidiOutputs[index].identifier);
             DBG("Successfully opened MIDI port: " << availableMidiOutputs[index].name);
         }
@@ -890,7 +958,7 @@ void SkaldProcessor::exportMidiFile(const juce::File& targetFile)
         if (!dot.active) continue;
 
         int midiNote = ringToMidiNote(dot.ringIndex);
-        // Calcolo tempo basato sull'angolo (0-360 mapped to 0-8 beats)
+        // Angle-based tempo calculation (0-360 mapped to 0-8 beats)
         double beatPosition = (dot.angle / 360.0) * 8.0;
         double timeInTicks = beatPosition * ticksPerQuarter;
 
@@ -912,8 +980,146 @@ void SkaldProcessor::exportMidiFile(const juce::File& targetFile)
         midiFile.writeTo(*outStream);
 }
 
+void SkaldProcessor::applyMidiControl(const juce::String& paramID, int value)
+{
+    // A) Continuous Controls (Linear Mapping 0-127)
+    if (paramID == "speed") setSpeed(juce::jmap((float)value, 0.0f, 127.0f, 0.1f, 4.0f));
+    else if (paramID == "tempo") setStandaloneBPM(juce::jmap((double)value, 0.0, 127.0, 40.0, 240.0));
+    else if (paramID == "prob") setProbability((float)value / 127.0f * 100.0f);
+    else if (paramID == "swing") setSwing((float)value / 127.0f * 100.0f);
+    else if (paramID == "vel") setGlobalVelocity(value == 0 ? 1 : value);
+    else if (paramID == "vvar") setVelocityVariation((float)value / 127.0f * 100.0f);
+    else if (paramID == "gate") setGateTime(juce::jmap((float)value, 0.0f, 127.0f, 10.0f, 2000.0f));
+
+    // Scratch via MIDI (Absolute position mapping 0-127 -> 0-360 degrees)
+    else if (paramID == "scratch") {
+        float newAngle = (float)value / 127.0f * 360.0f;
+        currentRotation = newAngle; // Set the rotation directly
+        // Reset triggers to prevent "playing" old notes while moving
+        std::fill(triggeredThisRotation.begin(), triggeredThisRotation.end(), false);
+    }
+
+    // --- Algorithmic Controls via MIDI (Using Existing Variables) ---
+    else if (paramID == "pulses") {
+        lastPulses = juce::jlimit(0, 32, (int)juce::jmap((float)value, 0.0f, 127.0f, 0.0f, 32.0f));
+        // With a ring selected, it updates and generates
+        generateHyperPattern(0, lastPulses, lastSteps, lastDepth, lastShift);
+    }
+    else if (paramID == "steps") {
+        lastSteps = juce::jlimit(1, 32, (int)juce::jmap((float)value, 0.0f, 127.0f, 1.0f, 32.0f));
+        generateHyperPattern(0, lastPulses, lastSteps, lastDepth, lastShift);
+    }
+    else if (paramID == "shift") {
+        lastShift = juce::jlimit(0, 32, (int)juce::jmap((float)value, 0.0f, 127.0f, 0.0f, 32.0f));
+        generateHyperPattern(0, lastPulses, lastSteps, lastDepth, lastShift);
+    }
+
+    // B) Cyclic Selectors (Zoning)
+    else if (paramID == "div") {
+        int speedIdx = juce::jlimit(0, 4, (int)(value / 25.6f)); // 5 zone from 0.25x to 4x
+        float speeds[] = { 0.25f, 0.5f, 1.0f, 2.0f, 4.0f };
+        setSpeed(speeds[speedIdx]);
+    }
+    else if (paramID == "oct") {
+        setOctaveShift(juce::jlimit(-2, 2, (int)(value / 25.6f) - 2));
+    }
+
+    // C) List Selectors (Slot zone)
+    else if (paramID == "key") setRootNote(juce::jlimit(0, 11, (int)(value / 10.66f)));
+    else if (paramID == "scale") setScale(static_cast<ScaleType>(juce::jlimit(0, 12, (int)(value / 9.84f))));
+    else if (paramID == "h_depth") {
+        // Mapping: CC 0-127 -> Values 1, 2, 3, 4
+        lastDepth = juce::jlimit(1, 4, (int)(value / 32.0f) + 1);
+
+        // Apply the change and regenerate the Euclidean pattern (default ring is 0)
+        generateHyperPattern(0, lastPulses, lastSteps, lastDepth, lastShift);
+    }
+
+    // D) Switches (Toggle with threshold 64)
+    else if (paramID == "rev") { if (value > 64) setReverse(!getReverse()); }
+    else if (paramID == "motor") { if (value > 64) setMotorRunning(!getMotorRunning()); }
+    else if (paramID == "play") { if (value > 64) setPlaying(!isPlaying()); }
+}
+
+void SkaldProcessor::setupRtMidi() {
+    try {
+        using namespace rt::midi;
+
+        // 1. INSTANCE for MODERN standards (WMS and Bluetooth)
+        rtMidiInUWP = std::make_unique<RtMidiIn>(RtMidi::WINDOWS_UWP);
+        unsigned int uwpPorts = rtMidiInUWP->getPortCount();
+        for (unsigned int i = 0; i < uwpPorts; ++i) {
+            try {
+                rtMidiInUWP->openPort(i);
+                DBG("RtMidi UWP Opened: " << rtMidiInUWP->getPortName(i));
+            }
+            catch (...) { DBG("RtMidi UWP: Could not open port " << i); }
+        }
+        rtMidiInUWP->setCallback(&SkaldProcessor::midiCallback, this);
+        rtMidiInUWP->ignoreTypes(false, false, false);
+
+        // 2. INSTANCE for LEGACY standards (loopMIDI and 5-pin DIN Hardware)
+        rtMidiInLegacy = std::make_unique<RtMidiIn>(RtMidi::WINDOWS_MM);
+        unsigned int legacyPorts = rtMidiInLegacy->getPortCount();
+        for (unsigned int i = 0; i < legacyPorts; ++i) {
+            try {
+                // Avoid opening Microsoft GS Wavetable virtual ports that create feedback
+                juce::String pName = rtMidiInLegacy->getPortName(i);
+                if (!pName.containsIgnoreCase("Microsoft GS")) {
+                    rtMidiInLegacy->openPort(i);
+                    DBG("RtMidi Legacy Opened: " << pName);
+                }
+            }
+            catch (...) { DBG("RtMidi Legacy: Could not open port " << i); }
+        }
+        rtMidiInLegacy->setCallback(&SkaldProcessor::midiCallback, this);
+        rtMidiInLegacy->ignoreTypes(false, false, false);
+
+    }
+    catch (rt::midi::RtMidiError& error) {
+        DBG("RtMidi Critical Error: " + juce::String(error.getMessage()));
+    }
+}
+
+// The callback is called in a separate high-priority thread
+void SkaldProcessor::midiCallback(double deltatime, std::vector<unsigned char>* message, void* userData)
+{
+    auto* processor = static_cast<SkaldProcessor*>(userData);
+    if (message->size() < 3) return;
+
+    // Protects processor data access from the two RtMidi threads
+    juce::ScopedLock sl(processor->midiCallbackLock);
+
+    int status = message->at(0);
+    int data1 = message->at(1);
+    int data2 = message->at(2);
+
+    if ((status & 0xF0) == 0xB0) { // MIDI CC
+        int ccNumber = data1;
+        int value = data2;
+
+        if (processor->isMidiLearning && processor->lastParamToLearn.isNotEmpty()) {
+            processor->midiMappings[processor->lastParamToLearn] = ccNumber;
+            processor->isMidiLearning = false;
+            processor->lastParamToLearn = "";
+            return;
+        }
+
+        for (auto const& [paramID, mappedCC] : processor->midiMappings) {
+            if (ccNumber == mappedCC) {
+                processor->applyMidiControl(paramID, value);
+
+                // Atomic updates for critical parameters in real time
+                if (paramID == "speed")
+                    processor->midiSpeed.store(juce::jmap((float)value, 0.0f, 127.0f, 0.1f, 4.0f));
+                else if (paramID == "prob")
+                    processor->midiProbability.store((float)value / 127.0f * 100.0f);
+            }
+        }
+    }
+}
+
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new SkaldProcessor();
 }
-
