@@ -123,6 +123,24 @@ private:
     juce::TextButton randomizeButton;
     juce::Label randomizeLabel;
     juce::TextButton playStopButton;
+    juce::TextButton learnButton; // Global LRN key
+    juce::Label learnLabel;
+
+    // Internal class for MIDI matrix popup
+    class MidiMatrixPopup : public juce::Component, public juce::Timer {
+    public:
+        MidiMatrixPopup(SkaldProcessor& p, SkaldEditor& e);
+        void paint(juce::Graphics& g) override;
+        void mouseDown(const juce::MouseEvent& event) override;
+        void timerCallback() override; // To update the CC values ​​seen in real time
+    private:
+        SkaldProcessor& processor;
+        SkaldEditor& editor;
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiMatrixPopup)
+    };
+
+    std::unique_ptr<MidiMatrixPopup> midiMatrixPopup;
+
     juce::Label bpmLabel;
     juce::Slider bpmSlider;
 
@@ -153,10 +171,10 @@ private:
     juce::Label exportMidiLabel;
     juce::TextButton aboutButton;
     juce::Label aboutLabel;
-    juce::TextButton refreshMidiButton;     // Patch: Pulsante per aggiornamento porte MIDI
+    juce::TextButton refreshMidiButton;     // MIDI Port Update Button
     juce::Label refreshMidiLabel;
 
-    // --- Sezione Algoritmica (Punto 2 e 3) ---
+    // --- Algorithmic Section ---
     juce::Slider pulsesSlider, stepsSlider, depthSlider, shiftSlider;
     juce::Label pulsesLabel, stepsLabel, depthLabel, shiftLabel;
     juce::ComboBox ringSelector;
