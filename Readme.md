@@ -1,4 +1,4 @@
-README
+# README
 
 <img src="./jbg2fcs2.png"
 style="width:7.14722in;height:4.75278in" />
@@ -30,17 +30,16 @@ New features:
 > 
 > Fixed GUI bugs on standalone and made GUI resizable.
 >
-> MIDI Multi-client, WindowsMidiServices, ASIO & Jack  support on Windows
-> (Jack audio driver only, not Jack Midi) (*).
+> MIDI Multi-client WMS, ASIO & Jack  support on Windows [Jack as audio driver only, not Jack Midi (*)].
 > 
 > MIDI Learn system
 
 ASIO and Jack Audio support are of little relevance, the app has a dummy 
 stereo output so that it can be recognized and managed by the host as a 
 synth and not as a MidiFX (due to the problems this causes in terms of writing on Windows).
-Juce does not support Jack Midi on Windows.
-Here only for Windows x64, using CMake v4.2.0, Juce v8.0.12 and Visual
-Studio Community Edition 2026 Insiders on Windows 11 (but being a Juce project it can be
+(*) Juce does not support Jack Midi on Windows.
+Fork here is only for Windows x64, using CMake v4.2.0, Juce v8.0.12 and Visual
+Studio  Insiders 2026, on Windows 11 25H2 (but being a Juce project it can be
 easily adapted for Mac and Linux).
 
 MIDI Channel, Velocity, Gate Time and in-ring position change modes are:
